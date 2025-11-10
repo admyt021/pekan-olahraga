@@ -1,0 +1,2508 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Papan Klasemen</title>
+    <!-- 1. Muat Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Muat Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 3. Ikon Font Awesome (Sangat penting untuk desain baru) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- 4. Muat Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 5. Muat Alpine.js (Untuk menu mobile) -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+    <style>
+        /* Terapkan font Inter sebagai default */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Sembunyikan panah di input number */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* Animasi goyang untuk login error */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        /* Style untuk Link Sidebar Aktif */
+        .sidebar-link.active {
+            background-color: #3b82f6; /* bg-blue-600 */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        /* Style untuk Tab Admin & Cabor */
+        .admin-tab-button.active, .cabor-tab-button.active {
+            border-color: #3b82f6; /* border-blue-600 */
+            color: #3b82f6; /* text-blue-600 */
+            background-color: #eff6ff; /* bg-blue-50 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen antialiased">
+
+    <!-- Struktur Dashboard -->
+    <div x-data="{ sidebarOpen: false }" class="flex h-screen bg-gray-100">
+        
+        <!-- Sidebar (Menu Samping) -->
+        <aside 
+            class="fixed inset-y-0 left-0 z-30 w-64 bg-gradient-to-b from-blue-700 to-blue-900 text-white transform -translate-x-full transition-transform duration-300 ease-in-out md:translate-x-0 md:static"
+            :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full': !sidebarOpen }"
+            @click.away="sidebarOpen = false"
+        >
+            <!-- Header sidebar (DIPERBARUI UNTUK LOGO KUSTOM) -->
+            <div class="flex flex-col items-center justify-center px-6 py-5 border-b border-blue-600/50 space-y-3">
+                <!-- Logo Container (BARU) -->
+                <div class="w-16 h-16 flex items-center justify-center">
+                    <img id="sidebar-logo-img" src="" alt="Logo" class="h-16 w-16 object-contain rounded-md hidden">
+                    <i id="sidebar-logo-icon" class="fas fa-bullhorn text-4xl text-white"></i>
+                </div>
+                <!-- Title -->
+                <span class="text-xl font-bold text-center leading-tight">
+                    HIGHLIGHTS PERTANDINGAN
+                </span>
+            </div>
+
+            <!-- Navigasi Sidebar (diberi padding atas) -->
+            <nav class="flex flex-col px-4 space-y-2 pt-4">
+                <a href="#" data-tab="klasemen" @click="sidebarOpen = false"
+                   class="sidebar-link active flex items-center px-4 py-3 text-gray-100 hover:bg-blue-600 hover:text-white rounded-lg transition-colors duration-200">
+                    <i class="fas fa-trophy w-6 text-center mr-3"></i>
+                    <span class="font-medium">Klasemen</span>
+                </a>
+                <a href="#" data-tab="cabor" @click="sidebarOpen = false"
+                   class="sidebar-link flex items-center px-4 py-3 text-gray-100 hover:bg-blue-600 hover:text-white rounded-lg transition-colors duration-200">
+                    <i class="fas fa-basketball-ball w-6 text-center mr-3"></i>
+                    <span class="font-medium">Detail Cabor</span>
+                </a>
+                <a href="#" data-tab="admin" @click="sidebarOpen = false"
+                   class="sidebar-link flex items-center px-4 py-3 text-gray-100 hover:bg-blue-600 hover:text-white rounded-lg transition-colors duration-200">
+                    <i class="fas fa-tools w-6 text-center mr-3"></i>
+                    <span class="font-medium">Admin Panel</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Overlay untuk mobile saat sidebar terbuka -->
+        <div x-show="sidebarOpen" class="fixed inset-0 z-20 bg-black bg-opacity-50 transition-opacity md:hidden" @click="sidebarOpen = false"></div>
+
+        <!-- Konten Utama (Kanan) -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            
+            <!-- Header (Navbar Atas) - Diperbarui -->
+            <header class="sticky top-0 z-10 bg-white shadow-md">
+                <!-- Ukuran dikembalikan, h-16 dihapus, py-5 ditambah -->
+                <div class="flex items-center justify-between px-4 sm:px-6 py-5">
+                    <!-- Tombol Hamburger (Hanya Mobile) -->
+                    <button @click.stop="sidebarOpen = !sidebarOpen" class="text-gray-600 focus:outline-none md:hidden">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+
+                    <!-- Judul Halaman Kontekstual (Dipindah ke KIRI) -->
+                    <h1 id="page-context-title" class="text-xl md:text-2xl font-bold text-gray-800 leading-snug px-4 whitespace-nowrap">
+                        Klasemen
+                    </h1>
+
+                    <!-- Spacer (Mendorong item ke kanan) -->
+                    <div class="flex-1"></div>
+
+                    <!-- Jam Real-Time (Diberi padding kiri agar tidak menempel) -->
+                    <div class="text-right pl-2">
+                        <div id="real-time-date" class="text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">Memuat Tanggal...</div>
+                        <div id="real-time-clock" class="text-xs font-medium text-gray-500 whitespace-nowrap">Memuat Jam...</div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Area Konten Utama (Scrollable) -->
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-8">
+                <!-- Judul Utama & Subjudul (Diperkecil) -->
+                <div class="text-left mb-6">
+                    <h1 id="main-app-title" class="text-2xl font-bold text-gray-800">Memuat Judul...</h1>
+                    <p id="header-subtitle" class="text-gray-600 text-base">Memuat Subjudul...</p>
+                </div>
+                
+                <!-- 1. Tampilan Klasemen Medali -->
+                <section id="klasemen-view" class="tab-content space-y-6">
+
+                    <!-- Stat Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-white rounded-xl shadow-lg p-5 flex items-center space-x-4">
+                            <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                                <i class="fas fa-basketball-ball text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Total Cabor</p>
+                                <p id="stat-total-cabor" class="text-2xl font-bold text-gray-800">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-5 flex items-center space-x-4">
+                            <div class="p-3 rounded-full bg-pink-100 text-pink-600">
+                                <i class="fas fa-flag-checkered text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Total Pertandingan</p>
+                                <p id="stat-total-match" class="text-2xl font-bold text-gray-800">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-5 flex items-center space-x-4">
+                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                                <i class="fas fa-medal text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Total Emas Diberikan</p>
+                                <p id="stat-total-gold" class="text-2xl font-bold text-gray-800">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                    <div class="flex justify-end mb-0 -mt-2">
+                        <button id="refresh-data-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-all flex items-center space-x-2 text-sm shadow-md">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Refresh Data</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Tabel Klasemen -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div class="p-4 border-b">
+                            <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-trophy mr-3 text-blue-500"></i>Klasemen Medali</h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left min-w-max">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="p-4 text-sm font-semibold uppercase text-gray-600">Rank</th>
+                                        <th class="p-4 text-sm font-semibold uppercase text-gray-600">Sekolah</th>
+                                        <th class="p-4 text-sm font-semibold uppercase text-gray-600 text-center" title="Emas">
+                                            <i class="fas fa-medal text-yellow-500"></i>
+                                        </th>
+                                        <th class="p-4 text-sm font-semibold uppercase text-gray-600 text-center" title="Perak">
+                                            <i class="fas fa-medal text-gray-400"></i>
+                                        </th>
+                                        <th class="p-4 text-sm font-semibold uppercase text-gray-600 text-center" title="Perunggu">
+                                            <i class="fas fa-medal text-orange-400"></i>
+                                        </th>
+                                        <th class="p-4 text-sm font-semibold uppercase text-gray-600 text-center">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="medal-tally-body" class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="6" class="p-8 text-center text-gray-500">Memuat data klasemen...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Grid Grafik & Peraih Emas -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Kontainer Grafik -->
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-chart-bar mr-3 text-pink-500"></i>Grafik Perolehan Medali</h2>
+                            </div>
+                            <div class="p-4 md:p-6">
+                                <div class="relative h-64 md:h-80">
+                                    <canvas id="medal-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Daftar Peraih Emas -->
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-medal mr-3 text-yellow-500"></i>Daftar Peraih Medali Emas</h2>
+                            </div>
+                            <div id="gold-winner-list" class="space-y-3 max-h-[22.5rem] overflow-y-auto p-4 md:p-6">
+                                <p class="text-center text-gray-500 p-4">Memuat daftar pemenang...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. Tampilan Cabang Olahraga -->
+                <section id="cabor-view" class="tab-content hidden space-y-6">
+                    
+                    <!-- **** PERUBAHAN DESAIN DIMULAI DI SINI **** -->
+                    <!-- DESAIN BARU: Custom Dropdown Cabor -->
+                    <div class="w-full max-w-lg mx-auto" 
+                         x-data="{ 
+                             open: false, 
+                             selectedCaborName: '--- Tampilkan Semua Cabor ---', 
+                             selectedCaborIcon: 'fas fa-list-ul' 
+                         }">
+                        
+                        <!-- 1. Select Asli (Tersembunyi) - Diperlukan oleh JS -->
+                        <select id="select-cabor-page" class="hidden">
+                            <option value="">--- Tampilkan Semua Cabor ---</option>
+                            <!-- Opsi akan di-populate oleh populateCaborDropdowns -->
+                        </select>
+            
+                        <!-- 2. Label -->
+                        <label class="block text-lg font-semibold text-gray-700 mb-3 text-left">Pilih Cabang Olahraga</label>
+                        
+                        <!-- 3. Tombol Dropdown Kustom -->
+                        <!-- PERBAIKAN: Padding diubah (p-3 md:p-4) -->
+                        <div class="relative">
+                            <button @click="open = !open" 
+                                    class="relative w-full bg-white rounded-xl shadow-lg border border-gray-200 p-3 md:p-4 text-left flex items-center justify-between transition-all duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                
+                                <span class="flex items-center">
+                                    <!-- Bagian Ikon yang Diperbarui (Bisa menampilkan FontAwesome atau Emoji) -->
+                                    <!-- PERBAIKAN: Ukuran font diubah (text-base md:text-lg) -->
+                                    <span class="w-6 text-center mr-3 text-base md:text-lg text-blue-500 transition-all">
+                                        <!-- Tampilkan <i> jika ikon adalah FontAwesome -->
+                                        <i :class="selectedCaborIcon" x-show="selectedCaborIcon.startsWith('fa')"></i>
+                                        <!-- Tampilkan <span> jika ikon BUKAN FontAwesome (cth: emoji) -->
+                                        <span x-text="selectedCaborIcon" x-show="!selectedCaborIcon.startsWith('fa')"></span>
+                                    </span>
+                                    <!-- PERBAIKAN: Ukuran font diubah (text-base md:text-lg) -->
+                                    <span x-text="selectedCaborName" class="text-base md:text-lg font-medium text-gray-800"></span>
+                                </span>
+                                
+                                <i class="fas fa-chevron-down text-gray-400 transition-transform duration-300" 
+                                   :class="{ 'rotate-180': open }"></i>
+                            </button>
+                        
+                            <!-- 4. Panel Dropdown -->
+                            <div x-show="open" 
+                                 @click.away="open = false"
+                                 x-transition:enter="transition ease-out duration-100"
+                                 x-transition:enter-start="opacity-0 transform -translate-y-2"
+                                 x-transition:enter-end="opacity-100 transform translate-y-0"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="opacity-100 transform translate-y-0"
+                                 x-transition:leave-end="opacity-0 transform -translate-y-2"
+                                 class="absolute z-20 w-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden max-h-72 overflow-y-auto"
+                                 style="display: none;">
+                                
+                                <!-- Opsi "Tampilkan Semua" -->
+                                <a href="#" 
+                                   @click.prevent="
+                                       open = false; 
+                                       selectedCaborName = '--- Tampilkan Semua Cabor ---'; 
+                                       selectedCaborIcon = 'fas fa-list-ul';
+                                       document.getElementById('select-cabor-page').value = '';
+                                       document.getElementById('select-cabor-page').dispatchEvent(new Event('change'));
+                                   "
+                                   class="flex items-center px-5 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150">
+                                    <i class="fas fa-list-ul w-6 text-center mr-3 text-gray-400"></i>
+                                    <span class="font-medium">Tampilkan Semua Cabor</span>
+                                </a>
+                                
+                                <!-- Opsi Dinamis (akan di-render oleh JS) -->
+                                <div id="cabor-dropdown-options-container">
+                                    <!-- Opsi akan di-render oleh populateCaborDropdowns -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- **** PERUBAHAN DESAIN SELESAI DI SINI **** -->
+
+
+                    <!-- Tombol Tab Cabor -->
+                    <div class="flex flex-wrap border-b border-gray-300">
+                        <button class="cabor-tab-button active py-3 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all" data-cabor-tab="jadwal">
+                            <i class="fas fa-calendar-alt mr-2"></i> Jadwal
+                        </button>
+                        <button class="cabor-tab-button py-3 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all" data-cabor-tab="hasil">
+                            <i class="fas fa-running mr-2"></i> Hasil Pertandingan
+                        </button>
+                        <button class="cabor-tab-button py-3 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all" data-cabor-tab="rekap">
+                            <i class="fas fa-trophy mr-2"></i> Rekap Juara
+                        </button>
+                    </div>
+
+                    <!-- Konten Tab Cabor -->
+                    <!-- DESAIN ULANG: Tab Jadwal -->
+                    <div id="cabor-tab-jadwal" class="cabor-tab-content space-y-4">
+                        <div id="cabor-jadwal-content" class="space-y-4">
+                            <p class="p-8 text-center text-gray-500 bg-white rounded-xl shadow-lg">Pilih cabor di atas untuk melihat jadwal.</p>
+                        </div>
+                    </div>
+                    <!-- DESAIN ULANG: Tab Hasil -->
+                    <div id="cabor-tab-hasil" class="cabor-tab-content hidden space-y-4">
+                        <div id="cabor-hasil-content" class="space-y-4">
+                            <p class="p-8 text-center text-gray-500 bg-white rounded-xl shadow-lg">Pilih cabor di atas untuk melihat hasil skor.</p>
+                        </div>
+                    </div>
+                    <!-- Tab Rekap (DESAIN BARU) -->
+                    <div id="cabor-tab-rekap" class="cabor-tab-content hidden space-y-6">
+                        <div id="cabor-rekap-content">
+                            <!-- Konten akan dirender oleh renderCaborJuaraTable() -->
+                            <p class="p-8 text-center text-gray-500 bg-white rounded-xl shadow-lg">Pilih cabor di atas untuk melihat rekap juara.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Tampilan Admin untuk Input Data -->
+                <section id="admin-view" class="tab-content hidden space-y-6">
+                    
+                    <!-- Tombol Tab Admin (5 Tab) -->
+                    <div class="flex flex-wrap border-b border-gray-300 bg-white rounded-t-xl shadow-lg overflow-x-auto">
+                        <button class="admin-tab-button active py-3 px-4 font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all whitespace-nowrap" data-admin-tab="skor">
+                            <i class="fas fa-pen-to-square mr-2"></i> Input Skor
+                        </button>
+                        <button class="admin-tab-button py-3 px-4 font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all whitespace-nowrap" data-admin-tab="jadwal">
+                            <i class="fas fa-calendar-plus mr-2"></i> Input Jadwal
+                        </button>
+                        <button class="admin-tab-button py-3 px-4 font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all whitespace-nowrap" data-admin-tab="hasil">
+                            <i class="fas fa-medal mr-2"></i> Tentukan Juara
+                        </button>
+                        <button class="admin-tab-button py-3 px-4 font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all whitespace-nowrap" data-admin-tab="pengaturan">
+                            <i class="fas fa-cog mr-2"></i> Pengaturan
+                        </button>
+                        <button class="admin-tab-button py-3 px-4 font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 transition-all whitespace-nowrap" data-admin-tab="manajemen">
+                            <i class="fas fa-database mr-2"></i> Manajemen Data
+                        </button>
+                    </div>
+
+                    <!-- Konten Tab Admin 1: Input Skor -->
+                    <div id="admin-tab-skor" class="admin-tab-content space-y-6">
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-pen-to-square mr-3 text-blue-500"></i>Tambah Skor Pertandingan</h2>
+                            </div>
+                            <form id="score-form" class="space-y-6 p-4 md:p-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="admin-skor-cabor" class="block text-sm font-medium text-gray-700 mb-2">Pilih Cabang Olahraga</label>
+                                        <select id="admin-skor-cabor" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                            <option value="">Memuat cabor...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="admin-skor-kategori" class="block text-sm font-medium text-gray-700 mb-2">Pilih Kategori</label>
+                                        <select id="admin-skor-kategori" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                            <option value="">--- Pilih Kategori ---</option>
+                                            <option value="Putra">Putra</option>
+                                            <option value="Putri">Putri</option>
+                                            <option value="Team">Team</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Input Pemain/Sekolah 1 -->
+                                    <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                        <label for="admin-skor-namapemain1" class="block text-sm font-medium text-gray-700">Pemain/Team 1</label>
+                                        <input type="text" id="admin-skor-namapemain1" placeholder="Nama Pemain/Team" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                        <label for="admin-skor-sekolah1" class="block text-sm font-medium text-gray-700">Sekolah 1</label>
+                                        <select id="admin-skor-sekolah1" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                            <option value="">--- Pilih Sekolah ---</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Input Pemain/Sekolah 2 -->
+                                    <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                        <label for="admin-skor-namapemain2" class="block text-sm font-medium text-gray-700">Pemain/Team 2</label>
+                                        <input type="text" id="admin-skor-namapemain2" placeholder="Nama Pemain/Team" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                        <label for="admin-skor-sekolah2" class="block text-sm font-medium text-gray-700">Sekolah 2</label>
+                                        <select id="admin-skor-sekolah2" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                            <option value="">--- Pilih Sekolah ---</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="md:col-span-2">
+                                        <label for="admin-skor-hasil" class="block text-sm font-medium text-gray-700 mb-2">Hasil / Skor Pertandingan</label>
+                                        <input type="text" id="admin-skor-hasil" placeholder="cth: 21-19, 21-18 atau 10.5 detik" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                    </div>
+                                </div>
+                                <button type="submit" id="submit-score-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition-all disabled:opacity-50">
+                                    <i class="fas fa-save mr-2"></i> Simpan Skor
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- TABEL RIWAYAT SKOR -->
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-history mr-3 text-purple-500"></i>Riwayat Skor (Terbaru)</h2>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left min-w-full">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Cabor</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Kategori</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Pemain 1</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Pemain 2</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Skor</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-score-table-body" class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td colspan="6" class="p-8 text-center text-gray-500">Memuat riwayat skor...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Konten Tab Admin 2: Input Jadwal -->
+                    <div id="admin-tab-jadwal" class="admin-tab-content hidden space-y-6">
+                        <!-- Form Tambah Jadwal Pertandingan -->
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-calendar-plus mr-3 text-blue-500"></i>Tambah Jadwal Pertandingan</h2>
+                            </div>
+                            <form id="schedule-form" class="space-y-6 p-4 md:p-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="admin-select-cabor-jadwal" class="block text-sm font-medium text-gray-700 mb-2">Pilih Cabang Olahraga</label>
+                                        <select id="admin-select-cabor-jadwal" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                            <option value="">Memuat cabor...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="admin-select-kategori-jadwal" class="block text-sm font-medium text-gray-700 mb-2">Pilih Kategori</label>
+                                        <select id="admin-select-kategori-jadwal" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                            <option value="">--- Pilih Kategori ---</option>
+                                            <option value="Putra">Putra</option>
+                                            <option value="Putri">Putri</option>
+                                            <option value="Team">Team</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="admin-jadwal-tanggal" class="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
+                                        <input type="date" id="admin-jadwal-tanggal" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                    </div>
+                                    <div>
+                                        <label for="admin-jadwal-waktu" class="block text-sm font-medium text-gray-700 mb-2">Waktu</label>
+                                        <input type="time" id="admin-jadwal-waktu" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                    </div>
+                                    
+                                    <!-- Input Pemain/Sekolah 1 -->
+                                    <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                        <label for="admin-jadwal-namapemain1" class="block text-sm font-medium text-gray-700">Pemain/Team 1 (Opsional)</label>
+                                        <input type="text" id="admin-jadwal-namapemain1" placeholder="cth: Tim A" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        
+                                        <label for="admin-jadwal-foto1" class="block text-sm font-medium text-gray-700">Foto Pemain 1 (Opsional)</label>
+                                        <input type="file" id="admin-jadwal-foto1" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                        <p class="text-xs text-gray-500">Maks. 500 KB</p>
+                                        
+                                        <label for="admin-jadwal-sekolah1" class="block text-sm font-medium text-gray-700">Sekolah 1 (Opsional)</label>
+                                        <select id="admin-jadwal-sekolah1" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">--- Pilih Sekolah ---</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Input Pemain/Sekolah 2 -->
+                                    <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                        <label for="admin-jadwal-namapemain2" class="block text-sm font-medium text-gray-700">Pemain/Team 2 (Opsional)</label>
+                                        <input type="text" id="admin-jadwal-namapemain2" placeholder="cth: Tim B" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        
+                                        <label for="admin-jadwal-foto2" class="block text-sm font-medium text-gray-700">Foto Pemain 2 (Opsional)</label>
+                                        <input type="file" id="admin-jadwal-foto2" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                                        <p class="text-xs text-gray-500">Maks. 500 KB</p>
+
+                                        <label for="admin-jadwal-sekolah2" class="block text-sm font-medium text-gray-700">Sekolah 2 (Opsional)</label>
+                                        <select id="admin-jadwal-sekolah2" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">--- Pilih Sekolah ---</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" id="submit-schedule-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition-all disabled:opacity-50">
+                                    <i class="fas fa-save mr-2"></i> Simpan Jadwal
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- TABEL RIWAYAT JADWAL -->
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-history mr-3 text-purple-500"></i>Riwayat Jadwal (Terbaru)</h2>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left min-w-full">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Cabor</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Kategori</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Pemain 1</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Pemain 2</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Tanggal</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Waktu</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-schedule-table-body" class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td colspan="7" class="p-8 text-center text-gray-500">Memuat riwayat jadwal...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Konten Tab Admin 3: Tentukan Juara -->
+                    <div id="admin-tab-hasil" class="admin-tab-content hidden space-y-6">
+                        <!-- Form Tambah Hasil (Juara) Pertandingan -->
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-medal mr-3 text-green-500"></i>Tentukan Juara Cabor</h2>
+                            </div>
+                            <form id="result-form" class="space-y-6 p-4 md:p-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- Kolom Kiri: Info Pertandingan -->
+                                    <div class="space-y-6">
+                                        <div>
+                                            <label for="admin-select-cabor" class="block text-sm font-medium text-gray-700 mb-2">Pilih Cabang Olahraga</label>
+                                            <select id="admin-select-cabor" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                                <option value="">Memuat cabor...</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="admin-select-kategori" class="block text-sm font-medium text-gray-700 mb-2">Pilih Kategori</label>
+                                            <select id="admin-select-kategori" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                                <option value="">--- Pilih Kategori ---</option>
+                                                <option value="Putra">Putra</option>
+                                                <option value="Putri">Putri</option>
+                                                <option value="Team">Team</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="admin-hasil-skor" class="block text-sm font-medium text-gray-700 mb-2">Catatan Final (Opsional)</label>
+                                            <input type="text" id="admin-hasil-skor" placeholder="cth: Final skor 21-19" class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                    </div>
+                                    <!-- Kolom Kanan: Pemenang -->
+                                    <div class="space-y-6">
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <label class="block text-lg font-semibold text-yellow-500">🥇 Juara 1 (Emas)</label>
+                                            <input type="text" id="admin-juara1-siswa" placeholder="Nama Siswa/Team" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500" required>
+                                            <select id="admin-juara1-sekolah" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500" required>
+                                                <option value="">--- Pilih Sekolah ---</option>
+                                            </select>
+                                        </div>
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <label class="block text-lg font-semibold text-gray-500">🥈 Juara 2 (Perak)</label>
+                                            <input type="text" id="admin-juara2-siswa" placeholder="Nama Siswa/Team" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                                            <select id="admin-juara2-sekolah" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                                                <option value="">--- Pilih Sekolah ---</option>
+                                            </select>
+                                        </div>
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <label class="block text-lg font-semibold text-orange-400">🥉 Juara 3 (Perunggu)</label>
+                                            <input type="text" id="admin-juara3-siswa" placeholder="Nama Siswa/Team" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                            <select id="admin-juara3-sekolah" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400">
+                                                <option value="">--- Pilih Sekolah ---</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" id="submit-result-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md transition-all disabled:opacity-50">
+                                    <i class="fas fa-save mr-2"></i> Simpan Data Juara
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- TABEL RIWAYAT HASIL (JUARA) -->
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-history mr-3 text-purple-500"></i>Riwayat Penetapan Juara (Terbaru)</h2>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left min-w-full">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Cabor</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Kategori</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Juara 1</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Juara 2</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Juara 3</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Catatan</th>
+                                            <th class="p-3 text-sm font-semibold uppercase text-gray-600">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-history-table-body" class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td colspan="7" class="p-8 text-center text-gray-500">Memuat riwayat juara...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Konten Tab Admin 4: Pengaturan (DIPERBARUI) -->
+                    <div id="admin-tab-pengaturan" class="admin-tab-content hidden space-y-6">
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-cog mr-3 text-gray-600"></i>Pengaturan Aplikasi</h2>
+                            </div>
+                            <form id="settings-form" class="space-y-4 p-4 md:p-6">
+                                
+                                <!-- BARU: Upload Logo -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Logo Aplikasi (di Sidebar)</label>
+                                    <div class="flex items-center space-x-4">
+                                        <img id="logo-preview-img" src="https://placehold.co/100x100/f3f4f6/9ca3af?text=Logo" alt="Preview Logo" class="h-16 w-16 rounded-md object-contain bg-gray-100 border">
+                                        <div class="flex-1">
+                                            <input type="file" id="setting-logo-upload" accept="image/png, image/jpeg, image/webp" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                            <p class="text-xs text-gray-500 mt-1">Maks. 500 KB. Format: PNG, JPG, WEBP.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label for="setting-title" class="block text-sm font-medium text-gray-700 mb-2">Judul Utama (di Halaman Utama)</label>
+                                    <input type="text" id="setting-title" placeholder="cth: Pekan Olahraga..." class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label for="setting-subtitle" class="block text-sm font-medium text-gray-700 mb-2">Subjudul (di Halaman Utama)</label>
+                                    <input type="text" id="setting-subtitle" placeholder="cth: Papan Klasemen..." class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <button type="submit" id="save-settings-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition-all disabled:opacity-50">
+                                    <i class="fas fa-save mr-2"></i> Simpan Pengaturan
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Konten Tab Admin 5: Manajemen Data -->
+                    <div id="admin-tab-manajemen" class="admin-tab-content hidden space-y-6">
+                        <div class="bg-white rounded-xl shadow-lg">
+                            <div class="p-4 border-b">
+                                <h2 class="text-xl font-semibold text-gray-800"><i class="fas fa-database mr-3 text-indigo-500"></i>Manajemen Data</h2>
+                            </div>
+                            <div class="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- Kolom Kiri: Tambah Data -->
+                                <div class="space-y-6">
+                                    <!-- PERBAIKAN: Form "Tambah Sekolah" -->
+                                    <div class="bg-gray-50 p-4 rounded-lg space-y-3 border border-gray-200">
+                                        <label for="new-school-name" class="block font-medium text-gray-700"><i class="fas fa-plus-circle mr-2 text-blue-500"></i>Tambah Sekolah Baru</label>
+                                        <!-- PERBAIKAN: flex-col sm:flex-row, space-y-2 sm:space-y-0, w-full sm:w-auto -->
+                                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                                            <input type="text" id="new-school-name" placeholder="cth: SMPN 1 Caringin" class="flex-grow bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
+                                            <button type="button" id="add-school-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-all w-full sm:w-auto">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <!-- PERBAIKAN: Form "Tambah Cabor" -->
+                                    <div class="bg-gray-50 p-4 rounded-lg space-y-3 border border-gray-200">
+                                        <label for="new-cabor-name" class="block font-medium text-gray-700"><i class="fas fa-plus-circle mr-2 text-blue-500"></i>Tambah Cabor Baru</label>
+                                        <!-- PERBAIKAN: flex-col sm:flex-row, space-y-2 sm:space-y-0, w-full sm:w-auto, w-full sm:w-20 -->
+                                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                                            <input type="text" id="new-cabor-name" placeholder="cth: Catur" class="flex-grow bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
+                                            <input type="text" id="new-cabor-icon" placeholder="Emoji 🏁" class="bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-20">
+                                            <button type="button" id="add-cabor-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-all w-full sm:w-auto">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Kolom Kanan: Zona Berbahaya -->
+                                <div class="p-4 border border-red-200 bg-red-50 rounded-lg">
+                                    <h3 class="text-xl font-semibold text-red-600 mb-4"><i class="fas fa-exclamation-triangle mr-2"></i>Zona Berbahaya</h3>
+                                    <div class="space-y-6">
+                                        <div id="delete-cabor-section" class="space-y-3">
+                                            <h4 class="font-medium text-gray-700">Hapus Cabang Olahraga</h4>
+                                            <p class="text-sm text-gray-600">Aksi ini tidak bisa dibatalkan.</p>
+                                            <select id="delete-select-cabor" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                                <option value="">Memuat cabor...</option>
+                                            </select>
+                                            <button type="button" id="delete-cabor-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-all disabled:opacity-50" disabled>
+                                                <i class="fas fa-trash mr-2"></i> Hapus Cabor
+                                            </button>
+                                        </div>
+                                        <div id="delete-school-section" class="space-y-3">
+                                            <h4 class="font-medium text-gray-700">Hapus Sekolah</h4>
+                                            <p class="text-sm text-gray-600">Aksi ini akan menghapus data klasemen.</p>
+                                            <select id="delete-select-school" class="w-full bg-white border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                                <option value="">Memuat sekolah...</option>
+                                            </select>
+                                            <button type="button" id="delete-school-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-all disabled:opacity-50" disabled>
+                                                <i class="fas fa-trash mr-2"></i> Hapus Sekolah
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Footer -->
+                <footer class="text-center mt-8 text-gray-600 text-sm">
+                    ©2025 Admin Decan Ganteng. All right reserved
+                    <div id="user-id-display" class="mt-2 text-xs text-gray-500"></div>
+                </footer>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal Pesan (Umum) -->
+    <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <p id="message-text" class="text-lg mb-6 text-gray-900">Pesan di sini</p>
+            <button id="close-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-md">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Konfirmasi -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <p id="confirm-text" class="text-lg mb-6 text-gray-900">Apakah Anda yakin?</p>
+            <div class="flex justify-center space-x-4">
+                <button id="confirm-btn-yes" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-md">
+                    Ya, Lanjutkan
+                </button>
+                <button id="confirm-btn-no" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-6 rounded-md">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- **** PERUBAHAN: Modal Peringatan (BARU) **** -->
+    <div id="warning-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
+            <div class="flex justify-center mb-4">
+                <!-- Ikon Peringatan Profesional -->
+                <div class="h-16 w-16 flex items-center justify-center rounded-full bg-red-100">
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-600"></i>
+                </div>
+            </div>
+            <h3 class="text-xl font-semibold mb-2 text-gray-900">Peringatan Ukuran File</h3>
+            <p id="warning-text" class="text-base mb-6 text-gray-700">Ukuran file terlalu besar! Maksimum 500KB.</p>
+            <button id="close-warning-modal-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-md transition-all">
+                Mengerti
+            </button>
+        </div>
+    </div>
+    <!-- **** AKHIR PERUBAHAN **** -->
+
+
+    <!-- Modal Login -->
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 w-full max-w-md">
+            <h2 class="text-3xl font-bold text-center mb-6 text-blue-500"><i class="fas fa-user-shield mr-2"></i>Admin Login</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="login-username" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input type="text" id="login-username" placeholder="admin" required
+                           class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required
+                           class="w-full bg-gray-100 border-gray-300 text-gray-900 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <p id="login-error" class="text-red-600 text-sm hidden text-center">Username atau password salah.</p>
+                <div class="pt-2 flex flex-col sm:flex-row-reverse gap-3">
+                    <button type="submit" id="login-submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-all">
+                        Login
+                    </button>
+                    <button type="button" id="close-login-modal-btn" class="w-full bg-gray-200 text-gray-800 hover:bg-gray-300 font-semibold py-2 px-4 rounded-md transition-all">
+                        Batal
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- 3. Muat Skrip Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-analytics.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            onSnapshot, 
+            collection, 
+            query, 
+            where, 
+            writeBatch,
+            runTransaction,
+            addDoc,
+            getDocs,
+            deleteDoc,
+            increment, 
+            Timestamp 
+        } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+        // --- KONFIGURASI DAN INISIALISASI ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCia8bCzZB6kBHDLKtpn9Z-qkfudXJ1Q8U",
+            authDomain: "aplikasi-website-787b2.firebaseapp.com",
+            projectId: "aplikasi-website-787b2",
+            storageBucket: "aplikasi-website-787b2.firebasestorage.app",
+            messagingSenderId: "409321652477",
+            appId: "1:409321652477:web:0e0b965bb64bee3f30be94",
+            measurementId: "G-9EH5HHHH9N"
+        };
+        
+        // --- KONFIGURASI UPLOAD CLOUDINARY ---
+        const CLOUDINARY_CLOUD_NAME = 'dk3hpvbkw';
+        const CLOUDINARY_UPLOAD_PRESET = 'papan-klasemen'; // <-- INI SUDAH DIGANTI
+        const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+        const MAX_IMAGE_SIZE_KB = 500; // Batas ukuran 500 KB
+        
+        // --- SVG AVATAR DEFAULT (UNTUK DESAIN BARU) ---
+        const DEFAULT_AVATAR_SVG_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="text-gray-400">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
+            </svg>
+        `)}`;
+
+
+        // Variabel global
+        let app, auth, db, userId;
+        let medalChartInstance = null;
+        window.currentSchoolData = []; 
+        let allCaborData = []; 
+        let allMatchesData = []; // Data JUARA
+        let allSchedulesData = []; // Data JADWAL
+        let allHasilSkorData = []; // Data SKOR
+        let isAdminLoggedIn = false; 
+        let currentConfig = {}; // BARU: Untuk menyimpan config
+        
+        // Elemen UI
+        const navLinks = document.querySelectorAll('.sidebar-link'); 
+        const contents = document.querySelectorAll('.tab-content');
+        const medalTallyBody = document.getElementById('medal-tally-body');
+        const refreshDataBtn = document.getElementById('refresh-data-btn');
+        
+        // Elemen Admin (Global)
+        const addSchoolBtn = document.getElementById('add-school-btn');
+        const addCaborBtn = document.getElementById('add-cabor-btn');
+        const deleteSelectCabor = document.getElementById('delete-select-cabor');
+        const deleteCaborBtn = document.getElementById('delete-cabor-btn');
+        const deleteSelectSchool = document.getElementById('delete-select-school'); 
+        const deleteSchoolBtn = document.getElementById('delete-school-btn');     
+
+        // Elemen Admin Tab Hasil (Juara)
+        const resultForm = document.getElementById('result-form');
+        const submitResultBtn = document.getElementById('submit-result-btn');
+        const adminSelectCabor = document.getElementById('admin-select-cabor');
+        const adminHistoryTableBody = document.getElementById('admin-history-table-body'); 
+        const adminJuara1Sekolah = document.getElementById('admin-juara1-sekolah');
+        const adminJuara2Sekolah = document.getElementById('admin-juara2-sekolah');
+        const adminJuara3Sekolah = document.getElementById('admin-juara3-sekolah');
+
+        // Elemen Admin Tab Skor
+        const scoreForm = document.getElementById('score-form');
+        const submitScoreBtn = document.getElementById('submit-score-btn');
+        const adminSkorCabor = document.getElementById('admin-skor-cabor');
+        const adminSkorKategori = document.getElementById('admin-skor-kategori');
+        const adminSkorNamaPemain1 = document.getElementById('admin-skor-namapemain1');
+        const adminSkorSekolah1 = document.getElementById('admin-skor-sekolah1');
+        const adminSkorNamaPemain2 = document.getElementById('admin-skor-namapemain2');
+        const adminSkorSekolah2 = document.getElementById('admin-skor-sekolah2');
+        const adminSkorHasil = document.getElementById('admin-skor-hasil');
+        const adminScoreTableBody = document.getElementById('admin-score-table-body'); // Tabel riwayat skor
+
+        // Elemen Admin Tab Jadwal
+        const adminTabButtons = document.querySelectorAll('.admin-tab-button');
+        const adminTabContents = document.querySelectorAll('.admin-tab-content');
+        const scheduleForm = document.getElementById('schedule-form');
+        const submitScheduleBtn = document.getElementById('submit-schedule-btn');
+        const adminSelectCaborJadwal = document.getElementById('admin-select-cabor-jadwal');
+        const adminScheduleTableBody = document.getElementById('admin-schedule-table-body');
+        const adminJadwalNamaPemain1 = document.getElementById('admin-jadwal-namapemain1');
+        const adminJadwalSekolah1 = document.getElementById('admin-jadwal-sekolah1');
+        const adminJadwalNamaPemain2 = document.getElementById('admin-jadwal-namapemain2');
+        const adminJadwalSekolah2 = document.getElementById('admin-jadwal-sekolah2');
+        // Elemen input file
+        const adminJadwalFoto1 = document.getElementById('admin-jadwal-foto1');
+        const adminJadwalFoto2 = document.getElementById('admin-jadwal-foto2');
+
+        
+        // Elemen Halaman Cabor
+        const caborPageSelect = document.getElementById('select-cabor-page'); // <-- INI SEKARANG <select> TERSEMBUNYI
+        const caborTabButtons = document.querySelectorAll('.cabor-tab-button');
+        const caborTabContents = document.querySelectorAll('.cabor-tab-content');
+        const caborJadwalContent = document.getElementById('cabor-jadwal-content');
+        const caborHasilContent = document.getElementById('cabor-hasil-content');
+        const caborRekapContent = document.getElementById('cabor-rekap-content');
+        
+        // Elemen Modal
+        const userIdDisplay = document.getElementById('user-id-display');
+        const modal = document.getElementById('message-modal');
+        const modalText = document.getElementById('message-text');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        
+        // Elemen Modal Konfirmasi
+        let confirmResolve = null; 
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmText = document.getElementById('confirm-text');
+        const confirmBtnYes = document.getElementById('confirm-btn-yes');
+        const confirmBtnNo = document.getElementById('confirm-btn-no');
+
+        // **** PERUBAHAN: Elemen Modal Peringatan (BARU) ****
+        const warningModal = document.getElementById('warning-modal');
+        const warningText = document.getElementById('warning-text');
+        const closeWarningModalBtn = document.getElementById('close-warning-modal-btn');
+        // **** AKHIR PERUBAHAN ****
+
+        // Elemen Modal Login
+        const loginModal = document.getElementById('login-modal');
+        const loginForm = document.getElementById('login-form');
+        const loginUsername = document.getElementById('login-username');
+        const loginPassword = document.getElementById('login-password');
+        const loginError = document.getElementById('login-error');
+        const closeLoginModalBtn = document.getElementById('close-login-modal-btn');
+
+        // Elemen Jam
+        const realTimeDateEl = document.getElementById('real-time-date');
+        const realTimeClockEl = document.getElementById('real-time-clock');
+
+        // Elemen Pengaturan Aplikasi
+        const pageContextTitle = document.getElementById('page-context-title'); // Judul di header kanan
+        const mainAppTitle = document.getElementById('main-app-title'); // Judul di halaman utama
+        const headerSubtitle = document.getElementById('header-subtitle');
+        const settingsForm = document.getElementById('settings-form');
+        const settingTitle = document.getElementById('setting-title');
+        const settingSubtitle = document.getElementById('setting-subtitle');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        const settingLogoUpload = document.getElementById('setting-logo-upload'); // BARU
+
+        // Elemen Stat Cards
+        const statTotalCabor = document.getElementById('stat-total-cabor');
+        const statTotalMatch = document.getElementById('stat-total-match');
+        const statTotalGold = document.getElementById('stat-total-gold');
+
+        // Path Database
+        const SCHOOLS_COL_PATH = `sekolah`;
+        const CABOR_COL_PATH = `cabor`;
+        const PERTANDINGAN_COL_PATH = `pertandingan`; // Ini adalah HASIL JUARA
+        const JADWAL_COL_PATH = `jadwal`; // Ini adalah JADWAL BARU
+        const HASILSKOR_COL_PATH = `hasilSkor`; // Ini adalah SKOR
+        const CONFIG_DOC_PATH = `config/appInfo`;
+
+        // --- FUNGSI UTAMA ---
+
+        // Fungsi Jam Real-Time
+        function startRealTimeClock() {
+            function updateClock() {
+                const now = new Date();
+                const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const dateString = now.toLocaleDateString('id-ID', dateOptions);
+                const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\./g, ':');
+                if (realTimeDateEl) realTimeDateEl.textContent = dateString;
+                if (realTimeClockEl) realTimeClockEl.textContent = timeString;
+            }
+            updateClock(); 
+            setInterval(updateClock, 1000); 
+        }
+
+        async function initializeAppAndAuth() {
+            try {
+                app = initializeApp(firebaseConfig);
+                const analytics = getAnalytics(app);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = `User ID: ${userId}`;
+                        console.log("Autentikasi berhasil. User ID:", userId);
+                        
+                        if (user.isAnonymous) {
+                            await seedInitialData();
+                        }
+                        setupListeners();
+                        
+                    } else {
+                        try {
+                            await signInAnonymously(auth);
+                            console.log("Login anonim berhasil.");
+                        } catch (authError) {
+                            console.error("Gagal login anonim:", authError);
+                            showMessageModal("Gagal terhubung ke autentikasi. Fitur mungkin terbatas.");
+                        }
+                    }
+                });
+
+                setupUIListeners();
+                startRealTimeClock(); 
+
+            } catch (error) {
+                console.error("Error saat inisialisasi Firebase:", error);
+                showMessageModal("Gagal terhubung ke server. Silakan muat ulang.");
+            }
+        }
+
+        async function seedInitialData() {
+            const schoolsQuery = query(collection(db, SCHOOLS_COL_PATH));
+            const schoolsSnapshot = await getDocs(schoolsQuery);
+
+            if (schoolsSnapshot.empty) {
+                console.log("Database kosong, menambahkan data awal...");
+                const batch = writeBatch(db);
+                batch.set(doc(collection(db, SCHOOLS_COL_PATH)), { name: "SMP PGRI CISEWU", gold: 0, silver: 0, bronze: 0 });
+                batch.set(doc(collection(db, SCHOOLS_COL_PATH)), { name: "SMPN 2 Mekarmukti", gold: 0, silver: 0, bronze: 0 });
+                batch.set(doc(collection(db, CABOR_COL_PATH)), { name: "Bola Voli", icon: "🏐" });
+                batch.set(doc(collection(db, CABOR_COL_PATH)), { name: "Bola Basket", icon: "🏀" });
+                await batch.commit();
+                console.log("Data awal sekolah & cabor berhasil ditambahkan.");
+            } else {
+                console.log("Database sudah berisi data.");
+            }
+
+            const configRef = doc(db, CONFIG_DOC_PATH);
+            const configSnap = await getDoc(configRef);
+            if (!configSnap.exists()) {
+                await setDoc(configRef, {
+                    title: "Pekan Olahraga Antar Sekolah",
+                    subtitle: "Papan Klasemen & Statistik 2025/2026",
+                    logoUrl: null // BARU: tambahkan field logo
+                });
+                console.log("Data config awal ditambahkan.");
+            }
+        }
+
+        function setupListeners() {
+            // 1. Listener untuk Koleksi Sekolah (Klasemen)
+            const schoolsQuery = query(collection(db, SCHOOLS_COL_PATH));
+            onSnapshot(schoolsQuery, (snapshot) => {
+                let schools = [];
+                let totalGold = 0;
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    schools.push({ id: doc.id, ...data });
+                    totalGold += data.gold || 0;
+                });
+                schools.sort((a, b) => {
+                    if (a.gold !== b.gold) return b.gold - a.gold;
+                    if (a.silver !== b.silver) return b.silver - a.silver;
+                    if (a.bronze !== b.bronze) return b.bronze - a.bronze;
+                    return a.name.localeCompare(b.name);
+                });
+                window.currentSchoolData = [...schools]; 
+                renderMedalTally(schools);
+                populateSchoolDropdowns(schools); 
+                renderMedalChart(schools); 
+                statTotalGold.textContent = totalGold;
+            }, (error) => {
+                console.error("Error listener klasemen: ", error);
+                medalTallyBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-red-400">Gagal memuat data klasemen.</td></tr>`;
+            });
+
+            // 2. Listener untuk Koleksi Cabang Olahraga
+            const caborQuery = query(collection(db, CABOR_COL_PATH));
+            onSnapshot(caborQuery, (snapshot) => {
+                let caborList = [];
+                snapshot.forEach((doc) => {
+                    caborList.push({ id: doc.id, ...doc.data() });
+                });
+                allCaborData = [...caborList]; // Simpan
+                populateCaborDropdowns(caborList); 
+                statTotalCabor.textContent = snapshot.size;
+            }, (error) => {
+                console.error("Error listener cabor: ", error);
+            });
+
+            // 3. Listener untuk Hasil (JUARA)
+            const matchesQuery = query(collection(db, PERTANDINGAN_COL_PATH));
+            onSnapshot(matchesQuery, (snapshot) => {
+                let matches = [];
+                snapshot.forEach((doc) => {
+                    matches.push({ id: doc.id, ...doc.data() });
+                });
+                matches.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                allMatchesData = [...matches]; // Simpan
+                renderAdminHistoryTable(matches); // Riwayat Juara
+                renderGoldMedalWinners(matches); 
+                statTotalMatch.textContent = snapshot.size;
+                updateCaborPageContent(); // Update rekap juara cabor
+            }, (error) => {
+                console.error("Error listener riwayat: ", error);
+                adminHistoryTableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-red-400">Gagal memuat riwayat.</td></tr>`;
+            });
+
+            // 4. Listener untuk JADWAL
+            const scheduleQuery = query(collection(db, JADWAL_COL_PATH));
+            onSnapshot(scheduleQuery, (snapshot) => {
+                let schedules = [];
+                snapshot.forEach((doc) => {
+                    schedules.push({ id: doc.id, ...doc.data() });
+                });
+                schedules.sort((a, b) => {
+                    const dateA = new Date(`${a.tanggal}T${a.waktu}`);
+                    const dateB = new Date(`${b.tanggal}T${b.waktu}`);
+                    return dateA - dateB;
+                });
+                allSchedulesData = [...schedules]; // Simpan
+                renderAdminScheduleTable(schedules);
+                updateCaborPageContent(); // Update jadwal cabor
+            }, (error) => {
+                console.error("Error listener jadwal: ", error);
+                adminScheduleTableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-red-400">Gagal memuat jadwal.</td></tr>`;
+            });
+
+            // 5. Listener untuk SKOR
+            const skorQuery = query(collection(db, HASILSKOR_COL_PATH));
+            onSnapshot(skorQuery, (snapshot) => {
+                let skorList = [];
+                snapshot.forEach((doc) => {
+                    skorList.push({ id: doc.id, ...doc.data() });
+                });
+                skorList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                allHasilSkorData = [...skorList]; // Simpan
+                renderAdminScoreTable(skorList); 
+                updateCaborPageContent(); // Update tabel hasil skor cabor
+            }, (error) => {
+                console.error("Error listener hasil skor: ", error);
+                adminScoreTableBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-red-400">Gagal memuat riwayat skor.</td></tr>`;
+            });
+
+            // 6. Listener untuk Config Aplikasi (DIPERBARUI)
+            const configRef = doc(db, CONFIG_DOC_PATH);
+            onSnapshot(configRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    currentConfig = docSnap.data(); // Simpan config
+                    const config = currentConfig; 
+
+                    // Update Judul
+                    mainAppTitle.textContent = config.title; // Judul di Halaman Utama
+                    headerSubtitle.textContent = config.subtitle;
+                    settingTitle.value = config.title;
+                    settingSubtitle.value = config.subtitle;
+
+                    // --- BARU: Update Logo ---
+                    const logoUrl = config.logoUrl;
+                    const sidebarLogoImg = document.getElementById('sidebar-logo-img');
+                    const sidebarLogoIcon = document.getElementById('sidebar-logo-icon');
+                    const logoPreview = document.getElementById('logo-preview-img');
+
+                    if (logoUrl) {
+                        if (sidebarLogoImg && sidebarLogoIcon) {
+                            sidebarLogoImg.src = logoUrl;
+                            sidebarLogoImg.classList.remove('hidden');
+                            sidebarLogoIcon.classList.add('hidden');
+                        }
+                        if (logoPreview) {
+                            logoPreview.src = logoUrl;
+                        }
+                    } else {
+                        if (sidebarLogoImg && sidebarLogoIcon) {
+                            sidebarLogoImg.classList.add('hidden');
+                            sidebarLogoIcon.classList.remove('hidden');
+                        }
+                        if (logoPreview) {
+                            logoPreview.src = 'https://placehold.co/100x100/f3f4f6/9ca3af?text=Logo';
+                        }
+                    }
+                    // --- AKHIR BARU ---
+
+                }
+            }, (error) => {
+                console.error("Error listener config: ", error);
+            });
+        }
+
+        // --- Logika Pindah Tab (Sidebar) ---
+        function switchTab(tabName) {
+            let activeLinkText = 'Dashboard'; // Default
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.dataset.tab === tabName) {
+                    link.classList.add('active');
+                    activeLinkText = link.querySelector('span').textContent; // Ambil teks menu
+                }
+            });
+            contents.forEach(content => {
+                content.id === `${tabName}-view` ? content.classList.remove('hidden') : content.classList.add('hidden');
+            });
+            
+            // Set header title di kiri
+            pageContextTitle.textContent = activeLinkText; 
+        }
+        
+        // Logika Pindah Tab Admin
+        function setupAdminTabs() {
+            adminTabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabName = button.dataset.adminTab;
+                    adminTabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    adminTabContents.forEach(content => {
+                        content.id === `admin-tab-${tabName}` ? content.classList.remove('hidden') : content.classList.add('hidden');
+                    });
+                });
+            });
+        }
+
+        // Logika Pindah Tab Cabor
+        function setupCaborTabs() {
+            caborTabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabName = button.dataset.caborTab;
+                    caborTabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    caborTabContents.forEach(content => {
+                        content.id === `cabor-tab-${tabName}` ? content.classList.remove('hidden') : content.classList.add('hidden');
+                    });
+                });
+            });
+        }
+
+        function setupUIListeners() {
+            // Listener Navigasi Sidebar
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const tabName = link.dataset.tab;
+                    if (tabName === 'admin') {
+                        if (isAdminLoggedIn) switchTab('admin');
+                        else {
+                            loginModal.classList.remove('hidden');
+                            loginUsername.focus();
+                        }
+                    } else switchTab(tabName);
+                });
+            });
+            
+            setupAdminTabs(); // Aktifkan tab admin
+            setupCaborTabs(); // Aktifkan tab cabor
+
+            refreshDataBtn.addEventListener('click', refreshData);
+            
+            // Listener Manajemen Data
+            addSchoolBtn.addEventListener('click', async () => {
+                const schoolNameInput = document.getElementById('new-school-name');
+                const schoolName = schoolNameInput.value.trim().toUpperCase();
+                if (schoolName) {
+                    try {
+                        await addDoc(collection(db, SCHOOLS_COL_PATH), { name: schoolName, gold: 0, silver: 0, bronze: 0 }); 
+                        showMessageModal(`Sekolah "${schoolName}" berhasil ditambahkan.`);
+                        schoolNameInput.value = '';
+                    } catch (error) { showMessageModal("Gagal menambahkan sekolah."); }
+                } else { showMessageModal("Nama sekolah tidak boleh kosong."); }
+            });
+
+            addCaborBtn.addEventListener('click', async () => {
+                const caborNameInput = document.getElementById('new-cabor-name');
+                const caborIconInput = document.getElementById('new-cabor-icon');
+                const caborName = caborNameInput.value.trim();
+                const caborIcon = caborIconInput.value.trim() || '🏆';
+                if (caborName) {
+                    try {
+                        await addDoc(collection(db, CABOR_COL_PATH), { name: caborName, icon: caborIcon });
+                        showMessageModal(`Cabor "${caborName}" berhasil ditambahkan.`);
+                        caborNameInput.value = ''; caborIconInput.value = '';
+                    } catch (error) { showMessageModal("Gagal menambahkan cabor."); }
+                } else { showMessageModal("Nama cabor tidak boleh kosong."); }
+            });
+
+            // Listener Form Admin
+            resultForm.addEventListener('submit', handleResultSubmit); // Form Juara
+            scheduleForm.addEventListener('submit', handleScheduleSubmit); // Form Jadwal
+            scoreForm.addEventListener('submit', handleScoreSubmit); // Form Skor
+
+            // Listener Modal
+            closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
+            loginForm.addEventListener('submit', handleLogin);
+            closeLoginModalBtn.addEventListener('click', () => {
+                loginModal.classList.add('hidden');
+                loginError.classList.add('hidden');
+                loginForm.reset();
+            });
+
+            // **** PERUBAHAN: Listener Modal Peringatan (BARU) ****
+            closeWarningModalBtn.addEventListener('click', () => warningModal.classList.add('hidden'));
+
+            // Listener Modal Konfirmasi
+            confirmBtnYes.addEventListener('click', () => {
+                if (confirmResolve) confirmResolve(true);
+                confirmModal.classList.add('hidden');
+                confirmResolve = null;
+            });
+            confirmBtnNo.addEventListener('click', () => {
+                if (confirmResolve) confirmResolve(false);
+                confirmModal.classList.add('hidden');
+                confirmResolve = null;
+            });
+
+            // Listener Zona Berbahaya
+            deleteSelectCabor.addEventListener('change', validateDeleteCaborForm); 
+            deleteCaborBtn.addEventListener('click', handleDeleteCabor);
+            deleteSelectSchool.addEventListener('change', validateDeleteSchoolForm); 
+            deleteSchoolBtn.addEventListener('click', handleDeleteSchool);         
+
+            // Listener Halaman Cabor
+            // *** PERUBAHAN: Listener 'change' sekarang ada di <select> tersembunyi ***
+            caborPageSelect.addEventListener('change', updateCaborPageContent);
+
+            // Listener Tabel Riwayat (INI PENTING)
+            adminHistoryTableBody.addEventListener('click', (e) => { // Riwayat Juara
+                const deleteBtn = e.target.closest('.delete-match-btn');
+                const editBtn = e.target.closest('.edit-match-btn');
+                if (deleteBtn) handleDeleteMatch(deleteBtn.dataset.matchId);
+                else if (editBtn) handleEditMatch(editBtn.dataset.matchId);
+            });
+            
+            // --- PERUBAHAN: Tambah listener untuk 'edit-schedule-btn' ---
+            adminScheduleTableBody.addEventListener('click', (e) => { // Riwayat Jadwal
+                const deleteBtn = e.target.closest('.delete-schedule-btn');
+                const editBtn = e.target.closest('.edit-schedule-btn'); // <-- DITAMBAHKAN
+                if (deleteBtn) handleDeleteSchedule(deleteBtn.dataset.scheduleId);
+                else if (editBtn) handleEditSchedule(editBtn.dataset.scheduleId); // <-- DITAMBAHKAN
+            });
+            
+            // --- PERUBAHAN: Tambah listener untuk 'edit-score-btn' ---
+            adminScoreTableBody.addEventListener('click', (e) => { // Riwayat Skor
+                const deleteBtn = e.target.closest('.delete-score-btn');
+                const editBtn = e.target.closest('.edit-score-btn'); // <-- DITAMBAHKAN
+                if (deleteBtn) handleDeleteScore(deleteBtn.dataset.scoreId);
+                else if (editBtn) handleEditScore(editBtn.dataset.scoreId); // <-- DITAMBAHKAN
+            });
+            
+            // **** PERUBAHAN: Listener Validasi File Upload (BARU) ****
+            adminJadwalFoto1.addEventListener('change', () => validateImageUpload(adminJadwalFoto1, MAX_IMAGE_SIZE_KB));
+            adminJadwalFoto2.addEventListener('change', () => validateImageUpload(adminJadwalFoto2, MAX_IMAGE_SIZE_KB));
+            settingLogoUpload.addEventListener('change', () => validateImageUpload(settingLogoUpload, MAX_IMAGE_SIZE_KB));
+            // **** AKHIR PERUBAHAN ****
+
+
+            // Listener Form Pengaturan (DIPERBARUI UNTUK UPLOAD)
+            settingsForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                saveSettingsBtn.disabled = true;
+                saveSettingsBtn.innerHTML = '<i class="fas fa-sync-alt animate-spin mr-2"></i> Menyimpan...';
+                
+                try {
+                    let newLogoUrl = currentConfig.logoUrl || null; // Ambil URL logo yang ada
+                    const file = document.getElementById('setting-logo-upload').files[0];
+                    
+                    // 1. Jika ada file baru di-upload
+                    if (file) {
+                        // **** PERUBAHAN: Validasi ukuran file dihapus dari sini ****
+                        // (Sudah divalidasi oleh event 'change')
+                        newLogoUrl = await uploadToCloudinary(file);
+                    }
+                    
+                    // 2. Siapkan data untuk disimpan
+                    const newTitle = settingTitle.value.trim();
+                    const newSubtitle = settingSubtitle.value.trim();
+                    
+                    if (!newTitle || !newSubtitle) {
+                            throw new Error("Judul and Subjudul tidak boleh kosong.");
+                    }
+
+                    const dataToSave = {
+                        ...currentConfig, // Pertahankan data lama (jika ada)
+                        title: newTitle,
+                        subtitle: newSubtitle,
+                        logoUrl: newLogoUrl
+                    };
+
+                    // 3. Simpan ke Firestore
+                    const configRef = doc(db, CONFIG_DOC_PATH);
+                    await setDoc(configRef, dataToSave); // setDoc (overwrite) lebih baik di sini
+                    
+                    showMessageModal("Pengaturan aplikasi berhasil disimpan.");
+                    document.getElementById('setting-logo-upload').value = null; // Kosongkan input file
+
+                } catch (error) {
+                    console.error("Error simpan pengaturan: ", error);
+                    showMessageModal(error.message || "Gagal menyimpan pengaturan.");
+                } finally {
+                    saveSettingsBtn.disabled = false;
+                    saveSettingsBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Simpan Pengaturan';
+                }
+            });
+        }
+
+        // --- Fungsi Handle Login ---
+        function handleLogin(e) {
+            e.preventDefault();
+            const user = loginUsername.value;
+            const pass = loginPassword.value;
+            if (user === 'admin' && pass === '12345') {
+                isAdminLoggedIn = true;
+                loginModal.classList.add('hidden');
+                loginError.classList.add('hidden');
+                loginForm.reset();
+                switchTab('admin'); 
+            } else {
+                loginError.classList.remove('hidden'); 
+                loginModal.querySelector('div').classList.add('animate-shake');
+                setTimeout(() => loginModal.querySelector('div').classList.remove('animate-shake'), 500);
+            }
+        }
+
+        // --- Handle Form Admin ---
+
+        // Handle Form "Tentukan Juara"
+        async function handleResultSubmit(e) {
+            e.preventDefault();
+            submitResultBtn.disabled = true;
+            submitResultBtn.textContent = "Menyimpan...";
+
+            const caborRef = doc(db, CABOR_COL_PATH, document.getElementById('admin-select-cabor').value);
+            const caborData = await getDoc(caborRef);
+            
+            const newMatch = {
+                caborId: caborRef.id,
+                caborName: caborData.data()?.name || "N/A",
+                kategori: document.getElementById('admin-select-kategori').value,
+                hasilSkor: document.getElementById('admin-hasil-skor').value || "N/A", // Ini catatan
+                createdAt: Timestamp.now(),
+                juara1_siswa: document.getElementById('admin-juara1-siswa').value,
+                juara1_sekolahId: document.getElementById('admin-juara1-sekolah').value,
+                juara1_sekolahName: adminJuara1Sekolah.options[adminJuara1Sekolah.selectedIndex].text,
+                juara2_siswa: document.getElementById('admin-juara2-siswa').value || null,
+                juara2_sekolahId: document.getElementById('admin-juara2-sekolah').value || null,
+                juara2_sekolahName: adminJuara2Sekolah.options[adminJuara2Sekolah.selectedIndex].text.replace("--- Pilih Sekolah ---", "") || null,
+                juara3_siswa: document.getElementById('admin-juara3-siswa').value || null,
+                juara3_sekolahId: document.getElementById('admin-juara3-sekolah').value || null,
+                juara3_sekolahName: adminJuara3Sekolah.options[adminJuara3Sekolah.selectedIndex].text.replace("--- Pilih Sekolah ---", "") || null,
+            };
+
+            if (!newMatch.caborId || !newMatch.kategori || !newMatch.juara1_siswa || !newMatch.juara1_sekolahId) {
+                showMessageModal("Data Cabor, Kategori, Juara 1 (Siswa & Sekolah) wajib diisi.");
+                submitResultBtn.disabled = false;
+                submitResultBtn.textContent = "Simpan Data Juara";
+                return;
+            }
+
+            try {
+                const batch = writeBatch(db);
+                const matchRef = doc(collection(db, PERTANDINGAN_COL_PATH));
+                batch.set(matchRef, newMatch);
+                const juara1Ref = doc(db, SCHOOLS_COL_PATH, newMatch.juara1_sekolahId);
+                batch.update(juara1Ref, { gold: increment(1) });
+                if (newMatch.juara2_sekolahId) {
+                    const juara2Ref = doc(db, SCHOOLS_COL_PATH, newMatch.juara2_sekolahId);
+                    batch.update(juara2Ref, { silver: increment(1) });
+                }
+                if (newMatch.juara3_sekolahId) {
+                    const juara3Ref = doc(db, SCHOOLS_COL_PATH, newMatch.juara3_sekolahId);
+                    batch.update(juara3Ref, { bronze: increment(1) });
+                }
+                await batch.commit();
+                showMessageModal("Data Juara berhasil disimpan! Medali telah diperbarui.");
+                resultForm.reset(); 
+            } catch (error) {
+                console.error("Error simpan hasil: ", error);
+                showMessageModal("Gagal menyimpan hasil. Cek konsol untuk error.");
+            } finally {
+                submitResultBtn.disabled = false;
+                submitResultBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Simpan Data Juara';
+            }
+        }
+
+        // Handle Form "Input Skor"
+        async function handleScoreSubmit(e) {
+            e.preventDefault();
+            submitScoreBtn.disabled = true;
+            submitScoreBtn.textContent = "Menyimpan...";
+
+            const caborRef = doc(db, CABOR_COL_PATH, adminSkorCabor.value);
+            const caborData = await getDoc(caborRef);
+            
+            const newScore = {
+                caborId: caborRef.id,
+                caborName: caborData.data()?.name || "N/A",
+                kategori: adminSkorKategori.value,
+                hasilSkor: adminSkorHasil.value || "N/A",
+                pemain1_nama: adminSkorNamaPemain1.value,
+                pemain1_sekolahId: adminSkorSekolah1.value,
+                pemain1_sekolahName: adminSkorSekolah1.options[adminSkorSekolah1.selectedIndex].text,
+                pemain2_nama: adminSkorNamaPemain2.value,
+                pemain2_sekolahId: adminSkorSekolah2.value,
+                pemain2_sekolahName: adminSkorSekolah2.options[adminSkorSekolah2.selectedIndex].text,
+                createdAt: Timestamp.now(),
+            };
+
+            if (!newScore.caborId || !newScore.kategori || !newScore.pemain1_nama || !newScore.pemain1_sekolahId || !newScore.pemain2_nama || !newScore.pemain2_sekolahId || !newScore.hasilSkor) {
+                showMessageModal("Semua data (Cabor, Kategori, Pemain 1, Sekolah 1, Pemain 2, Sekolah 2, Skor) wajib diisi.");
+                submitScoreBtn.disabled = false;
+                submitScoreBtn.textContent = "Simpan Skor";
+                return;
+            }
+
+            try {
+                // (Logika edit akan ditangani oleh 'handleEditScore' yang menghapus data lama)
+                // Ini akan selalu menambah data baru
+                await addDoc(collection(db, HASILSKOR_COL_PATH), newScore);
+                showMessageModal("Skor pertandingan berhasil disimpan!");
+                scoreForm.reset(); 
+            } catch (error) {
+                console.error("Error simpan skor: ", error);
+                showMessageModal("Gagal menyimpan skor.");
+            } finally {
+                submitScoreBtn.disabled = false;
+                submitScoreBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Simpan Skor';
+            }
+        }
+
+        // Handle Form "Input Jadwal" (Dengan Foto Cloudinary)
+        async function handleScheduleSubmit(e) {
+            e.preventDefault();
+            submitScheduleBtn.disabled = true;
+            submitScheduleBtn.textContent = "Menyimpan...";
+            
+            // Cek jika preset belum diisi
+            if (CLOUDINARY_UPLOAD_PRESET === 'GANTI_DENGAN_NAMA_PRESET_ANDA') {
+                showMessageModal("Error: Nama Upload Preset Cloudinary belum diatur di dalam kode JavaScript.");
+                submitScheduleBtn.disabled = false;
+                submitScheduleBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Simpan Jadwal';
+                return;
+            }
+
+            const file1 = adminJadwalFoto1.files[0];
+            const file2 = adminJadwalFoto2.files[0];
+            let foto1_url = null;
+            let foto2_url = null;
+            // **** PERUBAHAN: Validasi ukuran file dihapus dari sini ****
+
+            try {
+                // 1. Proses upload file 1
+                if (file1) {
+                    // (Validasi sudah dilakukan saat 'change')
+                    foto1_url = await uploadToCloudinary(file1);
+                }
+
+                // 2. Proses upload file 2
+                if (file2) {
+                    // (Validasi sudah dilakukan saat 'change')
+                    foto2_url = await uploadToCloudinary(file2);
+                }
+
+                // 3. Lanjutkan simpan data ke Firestore
+                const caborRef = doc(db, CABOR_COL_PATH, adminSelectCaborJadwal.value);
+                const caborData = await getDoc(caborRef);
+                
+                const newSchedule = {
+                    caborId: caborRef.id,
+                    caborName: caborData.data()?.name || "N/A",
+                    kategori: document.getElementById('admin-select-kategori-jadwal').value,
+                    tanggal: document.getElementById('admin-jadwal-tanggal').value,
+                    waktu: document.getElementById('admin-jadwal-waktu').value,
+                    pemain1_nama: adminJadwalNamaPemain1.value || null,
+                    pemain1_sekolahId: adminJadwalSekolah1.value || null,
+                    pemain1_sekolahName: adminJadwalSekolah1.options[adminJadwalSekolah1.selectedIndex].text.replace("--- Pilih Sekolah ---", "") || null,
+                    pemain1_foto_url: foto1_url, // Simpan URL
+                    pemain2_nama: adminJadwalNamaPemain2.value || null,
+                    pemain2_sekolahId: adminJadwalSekolah2.value || null,
+                    pemain2_sekolahName: adminJadwalSekolah2.options[adminJadwalSekolah2.selectedIndex].text.replace("--- Pilih Sekolah ---", "") || null,
+                    pemain2_foto_url: foto2_url, // Simpan URL
+                    createdAt: Timestamp.now(),
+                };
+
+                if (!newSchedule.caborId || !newSchedule.kategori || !newSchedule.tanggal || !newSchedule.waktu) {
+                    throw new Error("Data Cabor, Kategori, Tanggal, dan Waktu wajib diisi.");
+                }
+                
+                // (Logika edit akan ditangani oleh 'handleEditSchedule' yang menghapus data lama)
+                // Ini akan selalu menambah data baru
+                await addDoc(collection(db, JADWAL_COL_PATH), newSchedule);
+                showMessageModal("Jadwal pertandingan (dan foto) berhasil disimpan!");
+                scheduleForm.reset(); 
+                adminJadwalFoto1.value = null; // Reset input file
+                adminJadwalFoto2.value = null; // Reset input file
+            } catch (error) {
+                console.error("Error simpan jadwal: ", error);
+                showMessageModal(error.message || "Gagal menyimpan jadwal.");
+            } finally {
+                submitScheduleBtn.disabled = false;
+                submitScheduleBtn.innerHTML = '<i class="fas fa-save mr-2"></i> Simpan Jadwal';
+            }
+        }
+
+        // --- FUNGSI RENDER (PEMBANTU) ---
+
+        function renderMedalTally(schools) {
+            if (schools.length === 0) {
+                medalTallyBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500">Belum ada data sekolah.</td></tr>`;
+                return;
+            }
+            let html = '';
+            schools.forEach((school, index) => {
+                const total = (school.gold || 0) + (school.silver || 0) + (school.bronze || 0); 
+                html += `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="p-4 font-bold text-lg text-gray-700">${index + 1}</td>
+                        <td class="p-4 font-semibold text-lg text-gray-900">${school.name}</td>
+                        <td class="p-4 font-bold text-lg text-center text-yellow-500">${school.gold || 0}</td>
+                        <td class="p-4 font-bold text-lg text-center text-gray-400">${school.silver || 0}</td>
+                        <td class="p-4 font-bold text-lg text-center text-orange-400">${school.bronze || 0}</td>
+                        <td class="p-4 font-bold text-lg text-center text-gray-800">${total}</td>
+                    </tr>
+                `;
+            });
+            medalTallyBody.innerHTML = html;
+        }
+
+        function renderMedalChart(schools) {
+            const ctx = document.getElementById('medal-chart').getContext('2d');
+            if (medalChartInstance) medalChartInstance.destroy();
+            const tickColor = '#1f2937';
+            const gridColor = 'rgba(0, 0, 0, 0.05)';
+            const sortedSchools = [...schools]; 
+            const schoolNames = sortedSchools.map(s => s.name);
+            const goldData = sortedSchools.map(s => s.gold || 0);
+            const silverData = sortedSchools.map(s => s.silver || 0);
+            const bronzeData = sortedSchools.map(s => s.bronze || 0); 
+            medalChartInstance = new Chart(ctx, {
+                type: 'bar', 
+                data: {
+                    labels: schoolNames, 
+                    datasets: [
+                        { label: 'Emas', data: goldData, backgroundColor: 'rgba(253, 224, 71, 0.7)', borderColor: 'rgba(253, 224, 71, 1)', borderWidth: 1 },
+                        { label: 'Perak', data: silverData, backgroundColor: 'rgba(203, 213, 225, 0.7)', borderColor: 'rgba(203, 213, 225, 1)', borderWidth: 1 },
+                        { label: 'Perunggu', data: bronzeData, backgroundColor: 'rgba(253, 186, 116, 0.7)', borderColor: 'rgba(253, 186, 116, 1)', borderWidth: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, 
+                    scales: {
+                        x: { stacked: true, ticks: { color: tickColor }, grid: { color: gridColor } },
+                        y: { stacked: true, beginAtZero: true, ticks: { color: tickColor, stepSize: 1 }, grid: { color: gridColor } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: tickColor } },
+                        tooltip: { titleFont: { size: 14 }, bodyFont: { size: 12 } }
+                    }
+                }
+            });
+        }
+        
+        // Render Konten Halaman Cabor
+        function updateCaborPageContent() {
+            // *** PERUBAHAN: Sekarang membaca dari <select> tersembunyi ***
+            const selectedCaborId = caborPageSelect.value;
+            
+            // Filter data
+            let schedules = allSchedulesData;
+            let skorList = allHasilSkorData;
+            let matches = allMatchesData;
+            
+            if (selectedCaborId) {
+                schedules = allSchedulesData.filter(s => s.caborId === selectedCaborId);
+                skorList = allHasilSkorData.filter(s => s.caborId === selectedCaborId);
+                matches = allMatchesData.filter(m => m.caborId === selectedCaborId);
+            }
+            
+            // 1. Render Tab Jadwal (DESAIN BARU)
+            renderCaborJadwalList(schedules);
+            
+            // 2. Render Tab Hasil (SKOR) (DESAIN BARU)
+            renderCaborSkorList(skorList);
+            
+            // 3. Render Tab Rekap (JUARA) (DESAIN BARU)
+            renderCaborJuaraTable(matches);
+        }
+
+        // --- (DESAIN BARU) Render Tab Jadwal (Halaman Cabor) -> Daftar List ---
+        // PERBAIKAN TATA LETAK DIMULAI DI SINI
+        function renderCaborJadwalList(schedules) {
+            if (schedules.length === 0) {
+                caborJadwalContent.innerHTML = `<p class="p-8 text-center text-gray-500 bg-white rounded-xl shadow-lg">Belum ada jadwal untuk cabor ini.</p>`;
+                return;
+            }
+            
+            let html = '';
+            const dateOptions = { weekday: 'short', day: 'numeric', month: 'short' };
+            
+            schedules.forEach(jadwal => {
+                const jsDate = new Date(jadwal.tanggal + 'T' + jadwal.waktu);
+                const [dayName, dayNum, monthName] = jsDate.toLocaleDateString('id-ID', dateOptions).split(' ');
+                
+                const tglHari = jsDate.toLocaleDateString('id-ID', { weekday: 'long' });
+                const tglLengkap = jsDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+                const foto1 = jadwal.pemain1_foto_url || DEFAULT_AVATAR_SVG_URL;
+                const nama1 = jadwal.pemain1_nama || 'TBD';
+                const sekolah1 = jadwal.pemain1_sekolahName || 'TBD';
+
+                const foto2 = jadwal.pemain2_foto_url || DEFAULT_AVATAR_SVG_URL;
+                const nama2 = jadwal.pemain2_nama || 'TBD';
+                const sekolah2 = jadwal.pemain2_sekolahName || 'TBD';
+                
+                // --- PERUBAHAN DESAIN (HEADER DIHAPUS) ---
+                html += `
+                    <div class="bg-white rounded-xl shadow-lg transition-all hover:shadow-md overflow-hidden">
+                        
+                        <!-- Konten (diberi padding) -->
+                        <!-- PERBAIKAN: padding 'p-2 md:p-4' dan 'space-x-2 md:space-x-4' -->
+                        <div class="flex items-center space-x-2 md:space-x-4 p-2 md:p-4">
+                            <!-- Tanggal -->
+                            <!-- PERBAIKAN: width 'w-16 md:w-20' -->
+                            <div class="text-center w-16 md:w-20 flex-shrink-0">
+                                <p class="text-xs font-bold text-red-600 uppercase" title="${tglHari}">${dayName.replace('.', '')}</p>
+                                <!-- PERBAIKAN: text size 'text-2xl md:text-3xl' -->
+                                <p class="text-2xl md:text-3xl font-bold text-gray-800">${dayNum}</p>
+                                <!-- PERBAIKAN: text size 'text-xs md:text-sm' -->
+                                <p class="text-xs md:text-sm text-gray-500 font-medium">${monthName.replace('.', '')} | ${jadwal.waktu}</p>
+                            </div>
+                            
+                            <!-- Garis Pemisah -->
+                            <!-- PERBAIKAN: height 'h-16 md:h-20' -->
+                            <div class="border-l h-16 md:h-20 border-gray-200"></div>
+                            
+                            <!-- Detail Matchup (Grid) -->
+                            <!-- PERBAIKAN: 'grid-cols-3' (bukan grid-cols-1 md:grid-cols-3) dan 'gap-2 md:gap-4' -->
+                            <div class="flex-1 grid grid-cols-3 items-center gap-2 md:gap-4">
+                                
+                                <!-- Pemain 1 (CENTERED) -->
+                                <div class="flex flex-col items-center space-y-1 text-center">
+                                    <!-- PERBAIKAN: size 'w-8 h-8 md:w-12 md:h-12' -->
+                                    <img src="${foto1}" alt="${nama1}" class="w-8 h-8 md:w-12 md:h-12 rounded-full object-cover bg-gray-200 flex-shrink-0">
+                                    <div class="text-center flex-1 min-w-0">
+                                        <!-- PERBAIKAN: text size 'text-sm md:text-base' -->
+                                        <p class="font-semibold text-gray-800 truncate text-sm md:text-base">${nama1}</p>
+                                        <!-- PERBAIKAN: text size 'text-xs md:text-sm' -->
+                                        <p class="text-xs md:text-sm text-gray-500 truncate">${sekolah1}</p>
+                                    </div>
+                                </div>
+
+                                <!-- VS (CENTERED, dengan Info Cabor/Kategori) -->
+                                <!-- PERBAIKAN: 'order-first md:order-none' dihapus -->
+                                <div class="text-center flex flex-col items-center justify-center h-full">
+                                    
+                                    <!-- Info Cabor/Kategori (BARU & KECIL) -->
+                                    <div class="text-center mb-1 md:mb-2">
+                                        <span class="text-xs font-semibold text-blue-600 uppercase tracking-wide">${jadwal.caborName}</span>
+                                        <span class="text-xs text-gray-500 font-medium">(${jadwal.kategori})</span>
+                                    </div>
+                                    
+                                    <!-- PERBAIKAN: text size 'text-base md:text-2xl' -->
+                                    <span class="text-base md:text-2xl font-bold text-gray-400">VS</span>
+                                </div>
+
+                                <!-- Pemain 2 (CENTERED) -->
+                                <div class="flex flex-col items-center space-y-1 text-center">
+                                    <!-- PERBAIKAN: size 'w-8 h-8 md:w-12 md:h-12' -->
+                                    <img src="${foto2}" alt="${nama2}" class="w-8 h-8 md:w-12 md:h-12 rounded-full object-cover bg-gray-200 flex-shrink-0">
+                                    <div class="text-center flex-1 min-w-0">
+                                        <!-- PERBAIKAN: text size 'text-sm md:text-base' -->
+                                        <p class="font-semibold text-gray-800 truncate text-sm md:text-base">${nama2}</p>
+                                        <!-- PERBAIKAN: text size 'text-xs md:text-sm' -->
+                                        <p class="text-xs md:text-sm text-gray-500 truncate">${sekolah2}</p>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            caborJadwalContent.innerHTML = html;
+        }
+        // PERBAIKAN TATA LETAK SELESAI DI SINI
+
+        // --- (DESAIN BARU) Render Tab Hasil (SKOR) (Halaman Cabor) -> Daftar Skor ---
+        // --- PERBAIKAN: Ukuran font dan padding diubah ---
+        function renderCaborSkorList(skorList) {
+            if (skorList.length === 0) {
+                caborHasilContent.innerHTML = `<p class="p-8 text-center text-gray-500 bg-white rounded-xl shadow-lg">Belum ada skor pertandingan untuk cabor ini.</p>`;
+                return;
+            }
+            
+            let html = '';
+            skorList.forEach(skor => {
+                html += `
+                    <div class="bg-white rounded-xl shadow-lg p-3 md:p-4 transition-all hover:shadow-md">
+                        <div class="text-center mb-3">
+                            <span class="text-xs font-medium text-blue-500 bg-blue-100 px-3 py-1 rounded-full">${skor.caborName} - ${skor.kategori}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <!-- Pemain 1 -->
+                            <div class="flex-1 text-right pr-2 md:pr-4">
+                                <p class="font-semibold text-sm md:text-lg text-gray-800 truncate">${skor.pemain1_nama}</p>
+                                <p class="text-xs md:text-sm text-gray-500 truncate">${skor.pemain1_sekolahName}</p>
+                            </div>
+                            <!-- Skor -->
+                            <div class="bg-gray-800 text-white rounded-lg px-2 py-1 md:px-4 md:py-2 shadow-inner flex-shrink-0">
+                                <span class="text-base md:text-2xl font-bold tracking-wider">${skor.hasilSkor}</span>
+                            </div>
+                            <!-- Pemain 2 -->
+                            <div class="flex-1 text-left pl-2 md:pl-4">
+                                <p class="font-semibold text-sm md:text-lg text-gray-800 truncate">${skor.pemain2_nama}</p>
+                                <p class="text-xs md:text-sm text-gray-500 truncate">${skor.pemain2_sekolahName}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            caborHasilContent.innerHTML = html;
+        }
+        
+        // --- **** PERUBAHAN DESAIN REKAP JUARA (MINIMALIS) DIMULAI DI SINI **** ---
+        // Render Tab Rekap (JUARA) (Halaman Cabor) - Desain Profesional (BARU)
+        function renderCaborJuaraTable(matches) {
+            if (matches.length === 0) {
+                caborRekapContent.innerHTML = `<p class="p-8 text-center text-gray-500 bg-white rounded-xl shadow-lg">Belum ada juara yang ditentukan untuk cabor ini.</p>`;
+                return;
+            }
+            
+            // Sortir berdasarkan kategori dulu
+            matches.sort((a, b) => a.kategori.localeCompare(b.kategori));
+            
+            // Menggunakan Grid
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">';
+            
+            matches.forEach(match => {
+                const catatanHtml = (match.hasilSkor && match.hasilSkor !== 'N/A') 
+                    ? `<div class="pt-2 mt-2 border-t border-gray-200">
+                           <p class="text-sm text-gray-500 italic text-center">Catatan: ${match.hasilSkor}</p>
+                       </div>` 
+                    : '';
+
+                html += `
+                    <!-- Kartu Podium Profesional -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden transition-all hover:shadow-xl flex flex-col">
+                        
+                        <!-- Header (Judul BARU: Cabor (Kategori)) -->
+                        <div class="p-4 bg-gray-50 border-b border-gray-200">
+                            <p class="text-center text-lg font-semibold text-gray-800 truncate">${match.caborName} (${match.kategori})</p>
+                        </div>
+                        
+                        <!-- Body (Podium) - Desain Minimalis -->
+                        <div class="p-4 space-y-3 flex-1">
+                            
+                            <!-- Juara 1 (Emas) - Desain Garis -->
+                            <div class="flex items-center p-3 rounded-lg bg-white border border-gray-200 border-l-4 border-yellow-400 shadow-sm">
+                                <span class="text-lg font-bold text-yellow-600 w-12 flex-shrink-0">1st</span>
+                                <div class="min-w-0">
+                                    <p class="text-base font-semibold text-gray-900 truncate">${match.juara1_siswa}</p>
+                                    <p class="text-sm text-gray-600 truncate">${match.juara1_sekolahName}</p>
+                                </div>
+                            </div>
+
+                            <!-- Juara 2 (Perak) - Desain Garis -->
+                            <div class="flex items-center p-3 rounded-lg bg-white border border-gray-200 border-l-4 border-gray-400 shadow-sm">
+                                <span class="text-lg font-bold text-gray-500 w-12 flex-shrink-0">2nd</span>
+                                <div class="min-w-0">
+                                    <p class="text-base font-semibold text-gray-900 truncate">${match.juara2_siswa || '-'}</p>
+                                    <p class="text-sm text-gray-600 truncate">${match.juara2_sekolahName || '-'}</p>
+                                </div>
+                            </div>
+
+                            <!-- Juara 3 (Perunggu) - Desain Garis -->
+                            <div class="flex items-center p-3 rounded-lg bg-white border border-gray-200 border-l-4 border-orange-400 shadow-sm">
+                                <span class="text-lg font-bold text-orange-500 w-12 flex-shrink-0">3rd</span>
+                                <div class="min-w-0">
+                                    <p class="text-base font-semibold text-gray-900 truncate">${match.juara3_siswa || '-'}</p>
+                                    <p class="text-sm text-gray-600 truncate">${match.juara3_sekolahName || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Footer (Catatan) -->
+                        ${catatanHtml ? `<div class="p-4 bg-gray-50 border-t border-gray-100">${catatanHtml}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            caborRekapContent.innerHTML = html; // Render ke tab Rekap
+        }
+        // --- **** PERUBAHAN DESAIN REKAP JUARA (MINIMALIS) SELESAI DI SINI **** ---
+
+
+        // Render Tabel Riwayat Admin (HASIL JUARA)
+        function renderAdminHistoryTable(matches) {
+            if (matches.length === 0) {
+                adminHistoryTableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">Belum ada riwayat juara.</td></tr>`;
+                return;
+            }
+            let html = '';
+            matches.forEach(res => {
+                html += `
+                    <tr class="hover:bg-gray-50 transition-colors text-sm">
+                        <td class="p-3">${res.caborName}</td>
+                        <td class="p-3">${res.kategori}</td>
+                        <td class="p-3">
+                            <div class="font-semibold text-yellow-500">🥇 ${res.juara1_siswa}</div>
+                            <div class="text-xs text-gray-600">${res.juara1_sekolahName}</div>
+                        </td>
+                        <td class="p-3">
+                            <div class="font-semibold text-gray-600">🥈 ${res.juara2_siswa || '-'}</div>
+                            <div class="text-xs text-gray-500">${res.juara2_sekolahName || '-'}</div>
+                        </td>
+                        <td class="p-3">
+                            <div class="font-semibold text-orange-400">🥉 ${res.juara3_siswa || '-'}</div>
+                            <div class="text-xs text-gray-500">${res.juara3_sekolahName || '-'}</div>
+                        </td>
+                        <td class="p-3 text-gray-500">${res.hasilSkor}</td>
+                        <td class="p-3 text-sm space-x-2 whitespace-nowrap">
+                            <button title="Edit" data-match-id="${res.id}" class="edit-match-btn p-1 text-blue-500 hover:text-blue-700 transition-colors">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button title="Hapus" data-match-id="${res.id}" class="delete-match-btn p-1 text-red-500 hover:text-red-700 transition-colors">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            adminHistoryTableBody.innerHTML = html;
+        }
+        
+        // Render Tabel Riwayat Admin (SKOR)
+        function renderAdminScoreTable(skorList) {
+            if (skorList.length === 0) {
+                adminScoreTableBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500">Belum ada riwayat skor.</td></tr>`;
+                return;
+            }
+            let html = '';
+            skorList.forEach(res => {
+                html += `
+                    <tr class="hover:bg-gray-50 transition-colors text-sm">
+                        <td class="p-3">${res.caborName}</td>
+                        <td class="p-3">${res.kategori}</td>
+                        <td class="p-3">
+                            <div class="font-medium">${res.pemain1_nama}</div>
+                            <div class="text-xs text-gray-500">${res.pemain1_sekolahName}</div>
+                        </td>
+                        <td class="p-3">
+                            <div class="font-medium">${res.pemain2_nama}</div>
+                            <div class="text-xs text-gray-500">${res.pemain2_sekolahName}</div>
+                        </td>
+                        <td class="p-3 text-gray-600 font-medium">${res.hasilSkor}</td>
+                        <!-- PERUBAHAN: Tombol Edit ditambahkan -->
+                        <td class="p-3 text-sm space-x-2 whitespace-nowrap">
+                            <button title="Edit" data-score-id="${res.id}" class="edit-score-btn p-1 text-blue-500 hover:text-blue-700 transition-colors">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button title="Hapus" data-score-id="${res.id}" class="delete-score-btn p-1 text-red-500 hover:text-red-700 transition-colors">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            adminScoreTableBody.innerHTML = html;
+        }
+        
+        // Render Tabel Riwayat Admin (JADWAL)
+        function renderAdminScheduleTable(schedules) {
+            if (schedules.length === 0) {
+                adminScheduleTableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">Belum ada riwayat jadwal.</td></tr>`;
+                return;
+            }
+            let html = '';
+            const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+            schedules.forEach(jadwal => {
+                const tgl = new Date(jadwal.tanggal + 'T00:00:00-05:00').toLocaleDateString('id-ID', dateOptions); // Menyesuaikan timezone
+                html += `
+                    <tr class="hover:bg-gray-50 transition-colors text-sm">
+                        <td class="p-3">${jadwal.caborName}</td>
+                        <td class="p-3">${jadwal.kategori}</td>
+                        <td class="p-3">
+                            <div class="font-medium">${jadwal.pemain1_nama || '-'}</div>
+                            <div class="text-xs text-gray-500">${jadwal.pemain1_sekolahName || '-'}</div>
+                        </td>
+                        <td class="p-3">
+                            <div class="font-medium">${jadwal.pemain2_nama || '-'}</div>
+                            <div class="text-xs text-gray-500">${jadwal.pemain2_sekolahName || '-'}</div>
+                        </td>
+                        <td class="p-3">${tgl}</td>
+                        <td class="p-3">${jadwal.waktu}</td>
+                        <!-- PERUBAHAN: Tombol Edit ditambahkan -->
+                        <td class="p-3 text-sm space-x-2 whitespace-nowrap">
+                            <button title="Edit" data-schedule-id="${jadwal.id}" class="edit-schedule-btn p-1 text-blue-500 hover:text-blue-700 transition-colors">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button title="Hapus" data-schedule-id="${jadwal.id}" class="delete-schedule-btn p-1 text-red-500 hover:text-red-700 transition-colors">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            adminScheduleTableBody.innerHTML = html;
+        }
+
+        // Render Daftar Peraih Emas
+        function renderGoldMedalWinners(matches) {
+            const container = document.getElementById('gold-winner-list');
+            if (!container) return;
+            const goldWinners = matches.filter(match => match.juara1_siswa && match.juara1_sekolahName);
+            if (goldWinners.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-500 p-4">Belum ada peraih medali emas.</p>`;
+                return;
+            }
+            goldWinners.sort((a, b) => a.juara1_siswa.localeCompare(b.juara1_siswa));
+            let html = '';
+            goldWinners.forEach(match => {
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                        <div>
+                            <p class="font-semibold text-gray-800">${match.juara1_siswa}</p>
+                            <p class="text-sm text-gray-500">${match.juara1_sekolahName}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-blue-500">${match.caborName}</p>
+                            <p class="text-xs text-gray-400">${match.kategori}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        async function refreshData() {
+            const btn = document.getElementById('refresh-data-btn');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-sync-alt animate-spin mr-2"></i><span>Mengecek...</span>`; 
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            showMessageModal("Data sudah paling baru! (Aplikasi ini ter-update secara real-time)");
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-sync-alt"></i><span>Refresh Data</span>`;
+        }
+
+
+        // --- Fungsi Hapus & Edit Pertandingan (HASIL JUARA) ---
+        
+        // ===== PERBAIKAN DI SINI =====
+        // Memperbaiki Error "Firestore transactions require all reads to be executed before all writes."
+        async function runDeleteMatchTransaction(matchId) {
+            const matchRef = doc(db, PERTANDINGAN_COL_PATH, matchId);
+            let matchData;
+            try {
+                await runTransaction(db, async (transaction) => {
+                    // --- TAHAP 1: BACA SEMUA DATA (READS) ---
+                    const matchDoc = await transaction.get(matchRef); // READ 1
+                    if (!matchDoc.exists()) throw "Data juara tidak ditemukan.";
+                    matchData = matchDoc.data();
+
+                    const sekolahRefs = [];
+                    if (matchData.juara1_sekolahId) {
+                        sekolahRefs.push({ ref: doc(db, SCHOOLS_COL_PATH, matchData.juara1_sekolahId), type: 'gold' });
+                    }
+                    if (matchData.juara2_sekolahId) {
+                        sekolahRefs.push({ ref: doc(db, SCHOOLS_COL_PATH, matchData.juara2_sekolahId), type: 'silver' });
+                    }
+                    if (matchData.juara3_sekolahId) {
+                        sekolahRefs.push({ ref: doc(db, SCHOOLS_COL_PATH, matchData.juara3_sekolahId), type: 'bronze' });
+                    }
+                    
+                    // Lakukan 'get' untuk semua sekolah referensi
+                    // (Membaca semua dokumen sekolah terlebih dahulu)
+                    const sekolahDocs = await Promise.all(
+                        sekolahRefs.map(s => transaction.get(s.ref)) // READ 2, 3, 4 (jika ada)
+                    );
+                    
+                    // --- TAHAP 2: TULIS SEMUA DATA (WRITES) ---
+                    // Sekarang kita bisa melakukan update dan delete, karena semua 'get' sudah selesai.
+
+                    sekolahRefs.forEach((sRef, index) => {
+                        const sekolahDoc = sekolahDocs[index];
+                        if (sekolahDoc.exists()) { // Cek apakah sekolah ada
+                            if (sRef.type === 'gold') {
+                                transaction.update(sRef.ref, { gold: increment(-1) }); // WRITE 1
+                            } else if (sRef.type === 'silver') {
+                                transaction.update(sRef.ref, { silver: increment(-1) }); // WRITE 2
+                            } else if (sRef.type === 'bronze') {
+                                transaction.update(sRef.ref, { bronze: increment(-1) }); // WRITE 3
+                            }
+                        }
+                    });
+                    
+                    transaction.delete(matchRef); // WRITE 4
+                });
+                return matchData;
+            } catch (error) {
+                console.error("Gagal menjalankan transaksi hapus: ", error);
+                showMessageModal(`Error: ${error.message || error}`);
+                return null;
+            }
+        }
+        // ===== AKHIR PERBAIKAN =====
+
+        async function handleDeleteMatch(matchId) { // Hapus data JUARA
+            if (!isAdminLoggedIn) { showMessageModal("Anda harus login sebagai admin untuk menghapus."); return; }
+            const confirmed = await showConfirmModal("Apakah Anda yakin ingin menghapus data juara ini? Medali akan dikembalikan ke sekolah terkait.");
+            if (!confirmed) return;
+            const deletedData = await runDeleteMatchTransaction(matchId);
+            if (deletedData) showMessageModal("Data juara berhasil dihapus. Medali telah dikembalikan.");
+        }
+
+        async function handleEditMatch(matchId) { // Edit data JUARA
+            if (!isAdminLoggedIn) { showMessageModal("Anda harus login sebagai admin untuk mengedit."); return; }
+            const confirmed = await showConfirmModal("Ini akan MENGHAPUS data juara lama (dan medalinya) dan memuat datanya ke Form Juara untuk Anda perbaiki. Lanjutkan?");
+            if (!confirmed) return;
+
+            const matchData = await runDeleteMatchTransaction(matchId);
+
+            if (matchData) {
+                // Pindah ke tab "Tentukan Juara"
+                adminTabButtons.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.adminTab === 'hasil');
+                });
+                adminTabContents.forEach(content => {
+                    content.classList.toggle('hidden', content.id !== 'admin-tab-hasil');
+                });
+                
+                // Isi form
+                document.getElementById('admin-select-cabor').value = matchData.caborId;
+                document.getElementById('admin-select-kategori').value = matchData.kategori;
+                document.getElementById('admin-hasil-skor').value = matchData.hasilSkor || '';
+                document.getElementById('admin-juara1-siswa').value = matchData.juara1_siswa;
+                document.getElementById('admin-juara1-sekolah').value = matchData.juara1_sekolahId;
+                document.getElementById('admin-juara2-siswa').value = matchData.juara2_siswa || '';
+                document.getElementById('admin-juara2-sekolah').value = matchData.juara2_sekolahId || '';
+                document.getElementById('admin-juara3-siswa').value = matchData.juara3_siswa || '';
+                document.getElementById('admin-juara3-sekolah').value = matchData.juara3_sekolahId || '';
+                
+                resultForm.scrollIntoView({ behavior: 'smooth' });
+                showMessageModal("Data lama dihapus. Silakan perbaiki dan Simpan Data Juara yang baru.");
+            }
+        }
+        
+        // Fungsi Hapus JADWAL
+        async function handleDeleteSchedule(scheduleId) {
+            if (!isAdminLoggedIn) { showMessageModal("Anda harus login sebagai admin untuk menghapus."); return; }
+            const confirmed = await showConfirmModal("Apakah Anda yakin ingin menghapus jadwal ini?");
+            if (!confirmed) return;
+
+            try {
+                // TODO: Jika gambar diupload ke Cloudinary, tambahkan logika untuk HAPUS gambar tsb
+                // (Saat ini, gambar akan tetap di Cloudinary)
+                await deleteDoc(doc(db, JADWAL_COL_PATH, scheduleId));
+                showMessageModal("Jadwal berhasil dihapus.");
+            } catch (error) {
+                console.error("Error hapus jadwal: ", error);
+                showMessageModal("Gagal menghapus jadwal.");
+            }
+        }
+
+        // Fungsi Hapus SKOR
+        async function handleDeleteScore(scoreId) {
+            if (!isAdminLoggedIn) { showMessageModal("Anda harus login sebagai admin untuk menghapus."); return; }
+            const confirmed = await showConfirmModal("Apakah Anda yakin ingin menghapus skor ini?");
+            if (!confirmed) return;
+
+            try {
+                await deleteDoc(doc(db, HASILSKOR_COL_PATH, scoreId));
+                showMessageModal("Skor berhasil dihapus.");
+            } catch (error) {
+                console.error("Error hapus skor: ", error);
+                showMessageModal("Gagal menghapus skor.");
+            }
+        }
+
+        // --- DITAMBAHKAN: Fungsi Edit Skor ---
+        async function handleEditScore(scoreId) {
+            if (!isAdminLoggedIn) { showMessageModal("Anda harus login sebagai admin untuk mengedit."); return; }
+            const confirmed = await showConfirmModal("Ini akan MENGHAPUS skor lama dan memuat datanya ke Form Skor untuk Anda perbaiki. Lanjutkan?");
+            if (!confirmed) return;
+
+            // 1. Ambil data sebelum dihapus
+            const scoreData = allHasilSkorData.find(s => s.id === scoreId);
+            if (!scoreData) {
+                showMessageModal("Data skor tidak ditemukan.");
+                return;
+            }
+
+            // 2. Hapus data lama
+            try {
+                await deleteDoc(doc(db, HASILSKOR_COL_PATH, scoreId));
+                
+                // 3. Pindah ke tab "Input Skor"
+                adminTabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.adminTab === 'skor'));
+                adminTabContents.forEach(content => content.classList.toggle('hidden', content.id !== 'admin-tab-skor'));
+                
+                // 4. Isi form
+                adminSkorCabor.value = scoreData.caborId;
+                adminSkorKategori.value = scoreData.kategori;
+                adminSkorNamaPemain1.value = scoreData.pemain1_nama;
+                adminSkorSekolah1.value = scoreData.pemain1_sekolahId;
+                adminSkorNamaPemain2.value = scoreData.pemain2_nama;
+                adminSkorSekolah2.value = scoreData.pemain2_sekolahId;
+                adminSkorHasil.value = scoreData.hasilSkor;
+                
+                scoreForm.scrollIntoView({ behavior: 'smooth' });
+                showMessageModal("Data lama dihapus. Silakan perbaiki dan Simpan Skor yang baru.");
+
+            } catch (error) {
+                console.error("Error saat proses edit skor: ", error);
+                showMessageModal("Gagal memulai edit skor.");
+            }
+        }
+        
+        // --- DITAMBAHKAN: Fungsi Edit Jadwal ---
+        async function handleEditSchedule(scheduleId) {
+            if (!isAdminLoggedIn) { showMessageModal("Anda harus login sebagai admin untuk mengedit."); return; }
+            const confirmed = await showConfirmModal("Ini akan MENGHAPUS jadwal lama dan memuat datanya ke Form Jadwal untuk Anda perbaiki. (Foto harus di-upload ulang). Lanjutkan?");
+            if (!confirmed) return;
+
+            // 1. Ambil data sebelum dihapus
+            const scheduleData = allSchedulesData.find(s => s.id === scheduleId);
+            if (!scheduleData) {
+                showMessageModal("Data jadwal tidak ditemukan.");
+                return;
+            }
+
+            // 2. Hapus data lama
+            try {
+                // (Logika hapus foto di Cloudinary bisa ditambahkan di sini jika diperlukan, tapi saat ini kita skip)
+                await deleteDoc(doc(db, JADWAL_COL_PATH, scheduleId));
+                
+                // 3. Pindah ke tab "Input Jadwal"
+                adminTabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.adminTab === 'jadwal'));
+                adminTabContents.forEach(content => content.classList.toggle('hidden', content.id !== 'admin-tab-jadwal'));
+                
+                // 4. Isi form
+                adminSelectCaborJadwal.value = scheduleData.caborId;
+                document.getElementById('admin-select-kategori-jadwal').value = scheduleData.kategori;
+                document.getElementById('admin-jadwal-tanggal').value = scheduleData.tanggal;
+                document.getElementById('admin-jadwal-waktu').value = scheduleData.waktu;
+                adminJadwalNamaPemain1.value = scheduleData.pemain1_nama || '';
+                adminJadwalSekolah1.value = scheduleData.pemain1_sekolahId || '';
+                adminJadwalNamaPemain2.value = scheduleData.pemain2_nama || '';
+                adminJadwalSekolah2.value = scheduleData.pemain2_sekolahId || '';
+                
+                // Kosongkan input file
+                adminJadwalFoto1.value = null;
+                adminJadwalFoto2.value = null;
+                
+                scheduleForm.scrollIntoView({ behavior: 'smooth' });
+                showMessageModal("Data lama dihapus. Silakan perbaiki (dan upload ulang foto jika perlu) lalu Simpan Jadwal yang baru.");
+
+            } catch (error) {
+                console.error("Error saat proses edit jadwal: ", error);
+                showMessageModal("Gagal memulai edit jadwal.");
+            }
+        }
+
+
+        // --- Fungsi Dropdown ---
+        function populateSchoolDropdowns(schools) {
+            let optionsHtml = '<option value="">--- Pilih Sekolah ---</option>';
+            let deleteOptionsHtml = '<option value="">--- Pilih Sekolah untuk Dihapus ---</option>'; 
+            schools.forEach(school => {
+                optionsHtml += `<option value="${school.id}">${school.name}</option>`;
+                deleteOptionsHtml += `<option value="${school.id}">${school.name}</option>`; 
+            });
+            // Form Juara
+            adminJuara1Sekolah.innerHTML = optionsHtml;
+            adminJuara2Sekolah.innerHTML = optionsHtml;
+            adminJuara3Sekolah.innerHTML = optionsHtml; 
+            // Form Skor
+            adminSkorSekolah1.innerHTML = optionsHtml;
+            adminSkorSekolah2.innerHTML = optionsHtml;
+            // Form Jadwal
+            adminJadwalSekolah1.innerHTML = optionsHtml;
+            adminJadwalSekolah2.innerHTML = optionsHtml;
+            // Form Hapus
+            deleteSelectSchool.innerHTML = deleteOptionsHtml; 
+        }
+
+        // **** PERUBAHAN DESAIN (FUNGSI DROPDOWN) DIMULAI DI SINI ****
+        function populateCaborDropdowns(caborList) {
+            let optionsHtml = '<option value="">--- Pilih Cabor ---</option>';
+            let deleteOptionsHtml = '<option value="">--- Pilih Cabor untuk Dihapus ---</option>';
+            
+            // --- INI ADALAH PERUBAHAN ---
+            let pageOptionsSelectHtml = '<option value="">--- Tampilkan Semua Cabor ---</option>'; // Untuk <select>
+            let pageOptionsCustomHtml = ''; // Untuk <div> kustom
+            
+            caborList.sort((a, b) => a.name.localeCompare(b.name)); // Sortir A-Z
+
+            caborList.forEach(cabor => {
+                const icon = cabor.icon || '🏆'; // Default icon
+                optionsHtml += `<option value="${cabor.id}">${cabor.name}</option>`;
+                deleteOptionsHtml += `<option value="${cabor.id}">${cabor.name}</option>`;
+                
+                // 1. Buat HTML untuk <select> (tersembunyi)
+                pageOptionsSelectHtml += `<option value="${cabor.id}">${icon} ${cabor.name}</option>`;
+                
+                // 2. Buat HTML untuk <div> kustom (baru)
+                // (Penting: Gunakan escape character \' untuk string di dalam string)
+                pageOptionsCustomHtml += `
+                    <a href="#" 
+                       @click.prevent="
+                           open = false; 
+                           selectedCaborName = '${cabor.name.replace(/'/g, "\\'")}'; 
+                           selectedCaborIcon = '${icon}';
+                           document.getElementById('select-cabor-page').value = '${cabor.id}';
+                           document.getElementById('select-cabor-page').dispatchEvent(new Event('change'));
+                       "
+                       class="flex items-center px-5 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150">
+                        <span class="w-6 text-center mr-3 text-lg">${icon}</span>
+                        <span class="font-medium">${cabor.name}</span>
+                    </a>
+                `;
+            });
+            // --- AKHIR PERUBAHAN ---
+            
+            adminSelectCabor.innerHTML = optionsHtml; // Form Juara
+            adminSelectCaborJadwal.innerHTML = optionsHtml; // Form Jadwal
+            adminSkorCabor.innerHTML = optionsHtml; // Form Skor
+            deleteSelectCabor.innerHTML = deleteOptionsHtml; // Dropdown hapus
+            
+            // --- PERUBAHAN: Populate kedua elemen ---
+            caborPageSelect.innerHTML = pageOptionsSelectHtml; // Populate <select> tersembunyi
+            const customOptionsContainer = document.getElementById('cabor-dropdown-options-container');
+            if (customOptionsContainer) {
+                customOptionsContainer.innerHTML = pageOptionsCustomHtml; // Populate <div> kustom
+            }
+        }
+        // **** PERUBAHAN DESAIN (FUNGSI DROPDOWN) SELESAI DI SINI ****
+
+
+        // --- Fungsi Hapus ---
+        function validateDeleteCaborForm() { deleteCaborBtn.disabled = !deleteSelectCabor.value; }
+        function validateDeleteSchoolForm() { deleteSchoolBtn.disabled = !deleteSelectSchool.value; }
+
+        async function handleDeleteCabor() {
+            const caborId = deleteSelectCabor.value;
+            if (!caborId) { showMessageModal("Silakan pilih cabor yang ingin dihapus."); return; }
+            
+            const confirmed = await showConfirmModal("PERINGATAN: Aksi ini akan menghapus Cabor, SEMUA DATA JUARA, SEMUA SKOR, dan SEMUA JADWAL terkait. Lanjutkan?");
+            if (!confirmed) return;
+
+            deleteCaborBtn.disabled = true;
+            deleteCaborBtn.innerHTML = '<i class="fas fa-sync-alt animate-spin mr-2"></i> Menghapus...';
+            
+            try {
+                const batch = writeBatch(db);
+                // Hapus semua data juara (pertandingan)
+                const qMatches = query(collection(db, PERTANDINGAN_COL_PATH), where("caborId", "==", caborId));
+                const matchSnapshot = await getDocs(qMatches);
+                matchSnapshot.forEach(doc => batch.delete(doc.ref));
+                // Hapus semua jadwal
+                const qSchedules = query(collection(db, JADWAL_COL_PATH), where("caborId", "==", caborId));
+                const scheduleSnapshot = await getDocs(qSchedules);
+                scheduleSnapshot.forEach(doc => batch.delete(doc.ref));
+                // Hapus semua hasil skor
+                const qSkor = query(collection(db, HASILSKOR_COL_PATH), where("caborId", "==", caborId));
+                const skorSnapshot = await getDocs(qSkor);
+                skorSnapshot.forEach(doc => batch.delete(doc.ref));
+                // Hapus cabor itu sendiri
+                const caborRef = doc(db, CABOR_COL_PATH, caborId);
+                batch.delete(caborRef);
+                
+                await batch.commit();
+                showMessageModal("Cabang Olahraga (dan semua data terkait) berhasil dihapus.");
+            } catch (error) {
+                console.error("Error hapus cabor: ", error);
+                showMessageModal("Gagal menghapus cabor.");
+            } finally {
+                deleteCaborBtn.disabled = false;
+                deleteCaborBtn.innerHTML = '<i class="fas fa-trash mr-2"></i> Hapus Cabor';
+                validateDeleteCaborForm(); 
+            }
+        }
+
+        async function handleDeleteSchool() {
+            const schoolId = deleteSelectSchool.value;
+            if (!schoolId) { showMessageModal("Silakan pilih sekolah yang ingin dihapus."); return; }
+            const confirmed = await showConfirmModal("PERINGATAN: Aksi ini akan menghapus sekolah dan data medalinya. Ini TIDAK akan menghapus data juara/skor/jadwal yang terkait dengannya. Lanjutkan?");
+            if (!confirmed) return;
+
+            deleteSchoolBtn.disabled = true;
+            deleteSchoolBtn.innerHTML = '<i class="fas fa-sync-alt animate-spin mr-2"></i> Menghapus...';
+            
+            try {
+                await deleteDoc(doc(db, SCHOOLS_COL_PATH, schoolId));
+                showMessageModal("Sekolah berhasil dihapus.");
+            } catch (error) {
+                console.error("Error hapus sekolah: ", error);
+                showMessageModal("Gagal menghapus sekolah.");
+            } finally {
+                deleteSchoolBtn.disabled = false;
+                deleteSchoolBtn.innerHTML = '<i class="fas fa-trash mr-2"></i> Hapus Sekolah';
+                validateDeleteSchoolForm(); 
+            }
+        }
+
+        // --- FUNGSI HELPER (Modal & Konversi) ---
+
+        // Fungsi untuk menampilkan modal
+        function showMessageModal(message) {
+            modalText.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        // Fungsi modal konfirmasi (menggunakan Promise)
+        function showConfirmModal(message) {
+            return new Promise((resolve) => {
+                confirmResolve = resolve;
+                confirmText.textContent = message;
+                confirmModal.classList.remove('hidden');
+            });
+        }
+        
+        // **** PERUBAHAN: Fungsi Modal Peringatan (BARU) ****
+        // Fungsi untuk menampilkan modal peringatan
+        function showWarningModal(message) {
+            warningText.textContent = message;
+            warningModal.classList.remove('hidden');
+        }
+
+        // Fungsi validasi gambar (BARU)
+        function validateImageUpload(fileInput, maxSizeKB) {
+            const file = fileInput.files[0];
+            if (!file) return true; // Tidak ada file, lolos (opsional)
+
+            const maxSize = maxSizeKB * 1024;
+            if (file.size > maxSize) {
+                showWarningModal(`Ukuran file terlalu besar! Maksimum ${maxSizeKB}KB. File Anda tidak akan di-upload.`);
+                fileInput.value = null; // Reset input file
+                return false;
+            }
+            return true;
+        }
+        // **** AKHIR PERUBAHAN ****
+
+        // Fungsi upload ke Cloudinary
+        async function uploadToCloudinary(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+            try {
+                const response = await fetch(CLOUDINARY_API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!response.ok) {
+                    throw new Error(`Gagal upload ke Cloudinary. Status: ${response.status}`);
+                }
+                const data = await response.json();
+                return data.secure_url; // Kembalikan URL yang aman
+            } catch (error) {
+                console.error('Cloudinary upload error:', error);
+                throw new Error("Gagal mengunggah file gambar.");
+            }
+        }
+
+        // --- MULAI APLIKASI ---
+        initializeAppAndAuth();
+
+    </script>
+</body>
+</html>
